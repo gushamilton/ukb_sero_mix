@@ -11,7 +11,7 @@
 
 # --- 1. SETUP & CONFIGURATION ---
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(tidyverse, mixsmsn, sn, here, glue, pheatmap, furrr)
+pacman::p_load(tidyverse, mixsmsn, sn, here, glue, pheatmap, furrr, data.table)
 
 # Setup parallel processing
 plan(multisession, workers = availableCores() - 1)
@@ -257,50 +257,26 @@ cat("\n--- Writing Quickdraws Input Files ---\n")
 # 6a. Master Covariate File
 # NOTE: This assumes `age_sex.txt` and `covariates.txt` are in the working directory.
 # You may need to adjust paths for your environment.
+covar_base <- fread("age_sex.txt")
+pcs_base <- fread("covariates.txt")
 
-# Debug: Let's see what we're actually reading
-cat("Reading age_sex.txt...\n")
-covar_base <- read_delim("age_sex.txt", delim = "\t", show_col_types = FALSE)
-cat("age_sex.txt columns:", paste(names(covar_base), collapse = ", "), "\n")
+# Ensure column names are as expected, fread might add a 'V' prefix if headers are unusual
+setnames(covar_base, old = c("V1", "V2", "V3", "V4"), new = c("FID", "IID", "age", "sex"), skip_absent = TRUE)
+setnames(pcs_base, old = paste0("V", 1:22), new = c("FID", "IID", paste0("PC", 1:20)), skip_absent = TRUE)
 
-cat("Reading covariates.txt...\n")
-# Try different approaches for covariates.txt
-tryCatch({
-  pcs_base <- read_delim("covariates.txt", delim = " ", show_col_types = FALSE)
-}, error = function(e) {
-  cat("Failed to read with space delimiter, trying tab...\n")
-  pcs_base <<- read_delim("covariates.txt", delim = "\t", show_col_types = FALSE)
-})
 
-cat("covariates.txt columns:", paste(names(pcs_base), collapse = ", "), "\n")
-cat("First few rows of covariates.txt:\n")
-print(head(pcs_base, 3))
-
-# Ensure we have the expected column names
+# Ensure we have the expected column names after cleaning
 if (!all(c("FID", "IID") %in% names(covar_base))) {
-  stop("age_sex.txt must contain FID and IID columns")
+  stop("age_sex.txt must contain FID and IID columns after cleaning.")
+}
+if (!all(c("FID", "IID", paste0("PC", 1:20)) %in% names(pcs_base))) {
+  stop("covariates.txt must contain FID, IID, and PC1-20 columns after cleaning.")
 }
 
-if (!all(c("FID", "IID") %in% names(pcs_base))) {
-  stop("covariates.txt must contain FID and IID columns")
-}
-
-# Check if we have the PC columns
-pc_cols <- paste0("PC", 1:20)
-missing_pcs <- setdiff(pc_cols, names(pcs_base))
-if (length(missing_pcs) > 0) {
-  warning("Missing PC columns: ", paste(missing_pcs, collapse = ", "))
-}
-
-master_covar_table <- covar_base %>%
-  left_join(pcs_base, by = c("FID", "IID")) %>%
-  left_join(pc1_assay_noise_df, by = "IID") %>%
+master_covar_table <- merge(covar_base, pcs_base, by = c("FID", "IID")) %>%
+  merge(pc1_assay_noise_df, by = "IID") %>%
+  as_tibble() %>%
   select(FID, IID, age, sex, starts_with("PC"), PC1_assay_noise)
-
-# Debug: Check what PC columns we actually have
-pc_cols_in_output <- names(master_covar_table)[grepl("^PC", names(master_covar_table))]
-cat("PC columns in final output:", paste(pc_cols_in_output, collapse = ", "), "\n")
-cat("Number of PC columns:", length(pc_cols_in_output), "\n")
 
 write_tsv(master_covar_table, "quickdraws_input/covariates_master.tsv")
 cat("  -> Wrote master covariate file: quickdraws_input/covariates_master.tsv\n")
