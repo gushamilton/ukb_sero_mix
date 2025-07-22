@@ -162,23 +162,38 @@ process_antigen <- function(antigen_short_name, mfi_data, threshold) {
 
 # --- 4. MAIN ANALYSIS LOOP ---
 cat("\n--- Starting Phenotype Generation ---\n")
-all_pheno_list <- list(select(data_clean, FID, IID))
 
-for (i in 1:nrow(antigen_map)) {
-  ab_name <- antigen_map$short_name[i]
-  threshold <- antigen_map$threshold[i]
-  
-  if (!ab_name %in% names(data_clean)) next
-  
-  antigen_phenos <- process_antigen(ab_name, data_clean %>% select(FID, IID, !!sym(ab_name)), threshold)
+# Create a list of arguments for each antigen
+antigen_args <- antigen_map %>%
+  filter(short_name %in% names(data_clean)) %>%
+  mutate(
+    mfi_data = map(short_name, ~select(data_clean, FID, IID, !!sym(.x)))
+  ) %>%
+  select(antigen_short_name = short_name, mfi_data, threshold)
+
+# Process all antigens in parallel
+antigen_results <- map_dfr(antigen_args$antigen_short_name, function(ab_name) {
+  idx <- which(antigen_args$antigen_short_name == ab_name)
+  antigen_phenos <- process_antigen(
+    ab_name, 
+    antigen_args$mfi_data[[idx]], 
+    antigen_args$threshold[idx]
+  )
   
   if (!is.null(antigen_phenos)) {
-    all_pheno_list[[ab_name]] <- select(antigen_phenos, -starts_with("p_soft"), -!!sym(ab_name))
+    select(antigen_phenos, -starts_with("p_soft"), -!!sym(ab_name))
+  } else {
+    NULL
   }
-}
+}, .id = "antigen")
 
 # Combine all generated phenotypes into a single master tibble
-master_pheno_table <- reduce(all_pheno_list, left_join, by = c("FID", "IID"))
+master_pheno_table <- antigen_results %>%
+  select(-antigen) %>%
+  bind_rows(select(data_clean, FID, IID), .) %>%
+  group_by(FID, IID) %>%
+  summarise(across(everything(), ~first(na.omit(.))), .groups = "drop")
+
 cat("Master phenotype table generated with", ncol(master_pheno_table) - 2, "columns.\n")
 
 
