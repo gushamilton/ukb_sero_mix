@@ -88,14 +88,11 @@ This document provides detailed justification for the selection of specific anti
 
 ### T. gondii
 
-#### toxo_sag1
-- **Threshold:** 160
-- **Butler-Laporte Evidence:**
-  - rs541989586 (chr3, P=3.9e-08) near SOX2-OT
-  - rs148929820 (chr5, P=8.5e-10) near RP11-510I6.1
-  - rs11881343 (chr19, P=3.9e-08) near NOTCH3
-- **Rationale:** Multiple genetic associations outside MHC, important protozoal pathogen
-- **Expected Power Gain:** High - clear genetic signal with good distribution
+#### toxo_p22
+- **Threshold:** 100
+- **Butler-Laporte Evidence:** No specific hits in Table 2
+- **Rationale:** Protozoal pathogen representation with moderate two-component separation in log-MFI; p22 is the more stable antigen compared with sag1.
+- **Expected Power Gain:** Moderate – mixture model probabilities well calibrated despite a broad central hump
 
 ### Polyomaviruses
 
@@ -165,12 +162,6 @@ This document provides detailed justification for the selection of specific anti
 - **Rationale:** Additional H. pylori antigen, lower threshold
 - **Expected Power Gain:** Moderate - good for bacterial pathogen representation
 
-#### toxo_p22
-- **Threshold:** 100
-- **Butler-Laporte Evidence:** No specific hits in Table 2
-- **Rationale:** Additional T. gondii antigen, lower threshold
-- **Expected Power Gain:** Moderate - good for protozoal pathogen representation
-
 ## Excluded Antigens
 
 ### Chlamydia trachomatis (Additional antigens)
@@ -183,10 +174,15 @@ This document provides detailed justification for the selection of specific anti
 - **Butler-Laporte Evidence:** Only OMP and UreA show clear genetic signals
 - **Note:** CagA, VacA, GroEL, Catalase included for completeness but lower priority
 
-### T. gondii p22
-- **Reason:** Limited genetic signal compared to sag1
+### HPV16 (l1, e6, e7)
+- **Reason:** Limited genetic signal for most antigens
 - **Butler-Laporte Evidence:** No specific hits in Table 2
-- **Note:** Included for completeness but sag1 is the primary T. gondii antigen
+- **Note:** Included for completeness but low priority
+
+### toxo_sag1
+- **Reason:** Limited genetic signal compared to p22
+- **Butler-Laporte Evidence:** No specific hits in Table 2
+- **Note:** Included for completeness but p22 is the primary T. gondii antigen
 
 ## Summary
 
