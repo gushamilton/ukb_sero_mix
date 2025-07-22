@@ -92,11 +92,11 @@ raw_data <- read_tsv("serology_export_title.tsv", show_col_types = FALSE, guess_
 # Select and rename only the columns we need, including FID/IID. Drop rows with missing values across all
 cols_to_keep <- setNames(antigen_map$full_name, antigen_map$short_name)
 data_clean <- raw_data %>%
-  select(FID, IID, any_of(cols_to_keep)) %>%
+  select(FID = `Participant ID`, IID = `Participant ID`, any_of(cols_to_keep)) %>%
   rename(any_of(cols_to_keep)) %>%
   mutate(across(-c(FID, IID), as.numeric)) %>%
-  drop_na()
-  
+  filter(!if_all(-c(FID, IID), is.na))
+
 cat("Data loaded for", ncol(data_clean) - 2, "antigens and", nrow(data_clean), "samples.\n")
 
 
@@ -129,36 +129,34 @@ fit_skew_mix <- function(y) {
 #' @return A tibble with FID, IID, and all generated phenotype/weight columns.
 process_antigen <- function(antigen_short_name, mfi_data, threshold) {
   cat("  -> Processing:", antigen_short_name, "\n")
-  
-  # Fit the mixture model
-  fit <- fit_skew_mix(mfi_data[[antigen_short_name]])
-  if (is.null(fit)) {
-    warning("Mixture model failed for ", antigen_short_name, ". Skipping.")
+  titres <- mfi_data[[antigen_short_name]]
+  # Indices of valid (positive) MFI values
+  idx_valid <- which(titres > 0 & is.finite(titres))
+  if (length(idx_valid) < 200) {
+    warning("Not enough data for ", antigen_short_name)
     return(NULL)
   }
   
-  # Identify positive component and get posterior probabilities
+  # Fit model on log-transformed valid titres
+  fit <- fit_skew_mix(titres[idx_valid])
+  if (is.null(fit)) return(NULL)
   pos_comp <- which.max(fit$mu)
-  p_soft_df <- tibble(
-      y_log = fit$y,
-      p_soft = fit$obs.prob[, pos_comp]
-  )
   
-  # Join posteriors back to the original data
-  mfi_data %>%
-    mutate(y_log = log(.data[[antigen_short_name]])) %>%
-    left_join(p_soft_df, by = "y_log") %>%
-    select(-y_log) %>%
-    # Generate the 4 phenotype/weight columns
+  # Initialise p_soft vector with NA and fill where we have a fit
+  p_soft_vec <- rep(NA_real_, length(titres))
+  p_soft_vec[idx_valid] <- fit$obs.prob[, pos_comp]
+  
+  # Build output tibble with new columns
+  out <- mfi_data %>%
     mutate(
-      !!glue("{antigen_short_name}_IgG_raw") := log(.data[[antigen_short_name]]),
-      !!glue("{antigen_short_name}_sero_hard") := if_else(.data[[antigen_short_name]] >= threshold, 1, 0),
-      !!glue("{antigen_short_name}_sero_soft") := p_soft,
-      !!glue("{antigen_short_name}_p_neg") := 1 - p_soft, # For PC1_neg
-      # Weights for downstream analysis
-      !!glue("{antigen_short_name}_w_hard") := 2 * abs(p_soft - 0.5),
-      !!glue("{antigen_short_name}_w_igg") := p_soft
+      !!glue("{antigen_short_name}_IgG_raw") := log(titres),
+      !!glue("{antigen_short_name}_sero_hard") := if_else(titres >= threshold, 1, 0),
+      !!glue("{antigen_short_name}_sero_soft") := p_soft_vec,
+      !!glue("{antigen_short_name}_p_neg") := 1 - p_soft_vec,
+      !!glue("{antigen_short_name}_w_hard") := 2 * abs(p_soft_vec - 0.5),
+      !!glue("{antigen_short_name}_w_igg") := p_soft_vec
     )
+  return(out)
 }
 
 
