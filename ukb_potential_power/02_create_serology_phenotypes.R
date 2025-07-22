@@ -297,6 +297,11 @@ master_covar_table <- covar_base %>%
   left_join(pc1_assay_noise_df, by = "IID") %>%
   select(FID, IID, age, sex, starts_with("PC"), PC1_assay_noise)
 
+# Debug: Check what PC columns we actually have
+pc_cols_in_output <- names(master_covar_table)[grepl("^PC", names(master_covar_table))]
+cat("PC columns in final output:", paste(pc_cols_in_output, collapse = ", "), "\n")
+cat("Number of PC columns:", length(pc_cols_in_output), "\n")
+
 write_tsv(master_covar_table, "quickdraws_input/covariates_master.tsv")
 cat("  -> Wrote master covariate file: quickdraws_input/covariates_master.tsv\n")
 
