@@ -33,8 +33,9 @@ antigen_map <- tribble(
   "cmv_pp52", "pp 52 antigen for Human Cytomegalovirus | Instance 0", 150,
   "cmv_pp28", "pp 28 antigen for Human Cytomegalovirus | Instance 0", 200,
   "vzv", "gE / gI antigen for Varicella Zoster Virus  | Instance 0", 100,
-  "hhv6_ie1a", "p101 k antigen for Human Herpesvirus-6 | Instance 0", 100,
-  "hhv6_ie1b", "p101 k antigen for Human Herpesvirus-6 | Instance 0", 100,
+  "hhv6_ie1a", "IE1A antigen for Human Herpesvirus-6 | Instance 0", 100,
+  "hhv6_ie1b", "IE1B antigen for Human Herpesvirus-6 | Instance 0", 100,
+  "hhv6_p101k", "p101 k antigen for Human Herpesvirus-6 | Instance 0", 100,
   "hhv7_u14", "U14 antigen for Human Herpesvirus-7 | Instance 0", 100,
   # Polyomaviridae
   "bkv_vp1", "BK VP1 antigen for Human Polyomavirus BKV | Instance 0", 250,
@@ -56,7 +57,26 @@ antigen_map <- tribble(
   "hp_urea", "UreA antigen for Helicobacter pylori | Instance 0", 130,
   # T. gondii
   "toxo_p22", "p22 antigen for Toxoplasma gondii | Instance 0", 100,
-  "toxo_sag1", "sag1 antigen for Toxoplasma gondii | Instance 0", 160
+  "toxo_sag1", "sag1 antigen for Toxoplasma gondii | Instance 0", 160,
+  # Additional antigens (added 2025-07-22)
+  "kshv_k8_1", "K8.1 antigen for Kaposi's Sarcoma-Associated Herpesvirus | Instance 0", 175,
+  "kshv_lana", "LANA antigen for Kaposi's Sarcoma-Associated Herpesvirus | Instance 0", 100,
+  # Hepatitis B
+  "hbv_hbc", "HBc antigen for Hepatitis B Virus | Instance 0", 100,
+  "hbv_hbe", "HBe antigen for Hepatitis B Virus | Instance 0", 150,
+  # Hepatitis C
+  "hcv_core", "Core antigen for Hepatitis C Virus | Instance 0", 150,
+  "hcv_ns3", "NS3 antigen for Hepatitis C Virus | Instance 0", 150,
+  # HIV / HTLV
+  "hiv_env", "HIV-1 env antigen for Human Immunodeficiency Virus | Instance 0", 150,
+  "hiv_gag", "HIV-1 gag antigen for Human Immunodeficiency Virus | Instance 0", 600,
+  "htlv_env", "HTLV-1 env antigen for Human T-Lymphotropic Virus 1 | Instance 0", 150,
+  "htlv_gag", "HTLV-1 gag antigen for Human T-Lymphotropic Virus 1 | Instance 0", 1500,
+  # Papillomavirus HPV16/18
+  "hpv16_l1", "L1 antigen for Human Papillomavirus type-16 | Instance 0", 175,
+  "hpv16_e6", "E6 antigen for Human Papillomavirus type-16 | Instance 0", 120,
+  "hpv16_e7", "E7 antigen for Human Papillomavirus type-16 | Instance 0", 150,
+  "hpv18_l1", "L1 antigen for Human Papillomavirus type-18 | Instance 0", 175
 )
 
 # --- 3. Load and Clean Data ---
