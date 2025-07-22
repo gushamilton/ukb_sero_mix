@@ -1,12 +1,12 @@
 ################################################################################
-#   UKB SEROLOGY: POWER ANALYSIS FOR SOFT-THRESHOLDING
+#   UKB SEROLOGY: COMPREHENSIVE POWER ANALYSIS WITH HISTOGRAMS
 ################################################################################
-#  ∙ This script uses a 2-component skew-t mixture model to estimate the
-#    classification accuracy (Se, Sp) of hard MFI thresholds.
-#  ∙ It then calculates the sample size inflation factor (1/λ²) for each
-#    antibody, which estimates the power loss from using a hard cutoff
-#    compared to the "true" latent serostatus.
-#  ∙ The core logic is adapted from `test3.R`.
+#  ∙ This script provides a complete analysis of UKB serology data including:
+#    1. Plain histograms with seropositivity cutoffs
+#    2. Mixture model fitted histograms with component densities
+#    3. Power analysis with inflation factors (1/λ²)
+#  ∙ Uses a 2-component skew-t mixture model to estimate classification accuracy
+#  ∙ Calculates sample size inflation factor for each antibody
 ################################################################################
 
 
@@ -75,8 +75,8 @@ cat("Data loaded and cleaned for", ncol(data_clean), "antigens.\n")
 
 
 # --- 4. Mixture Model & Plotting Utility Functions ---
-# ... (fit_skew_mix, cdf_skew, lambda_stats, plot_mixture_diagnosis functions are unchanged)
-# ... functions from previous step are assumed to be here ...
+
+#' Mixture model fitting function
 fit_skew_mix <- function(y, fam = "Skew.t") {
   # Simplified for just skew-t
   tryCatch(
@@ -96,6 +96,7 @@ fit_skew_mix <- function(y, fam = "Skew.t") {
   )
 }
 
+#' Calculate lambda statistics for power analysis
 cdf_skew <- function(q, mu, sigma2, shape, fam, nu = 4) {
   omega <- sqrt(sigma2)
   sn::pst(q, xi = mu, omega = omega, alpha = shape, nu = nu)
@@ -125,8 +126,28 @@ lambda_stats <- function(fit, pos, cut_log, nu_default = 4) {
     Inflation_Factor = 1 / lambda^2
   )
 }
-plot_mixture_diagnosis <- function(data_vec, fit_model, hard_cutoff, title) {
 
+#' Create plain histogram with cutoff
+plot_plain_histogram <- function(data_vec, hard_cutoff, title) {
+  plot_df <- tibble(mfi = data_vec)
+  
+  p <- ggplot(plot_df, aes(x = mfi)) +
+    geom_histogram(aes(y = after_stat(density)), bins = 75, fill = "steelblue", alpha = 0.7) +
+    geom_vline(xintercept = hard_cutoff, color = "red", linetype = "dashed", size = 1) +
+    scale_x_log10(labels = scales::label_number(accuracy = 1)) +
+    labs(
+      title = title,
+      subtitle = paste0("Threshold = ", hard_cutoff, " (red dashed line)"),
+      x = "MFI (log scale)",
+      y = "Density"
+    ) +
+    theme_light()
+    
+  return(p)
+}
+
+#' Create mixture model diagnostic plot
+plot_mixture_diagnosis <- function(data_vec, fit_model, hard_cutoff, title) {
   if (is.null(fit_model)) return(NULL)
   
   pos_comp <- which.max(fit_model$mu)
@@ -169,11 +190,12 @@ plot_mixture_diagnosis <- function(data_vec, fit_model, hard_cutoff, title) {
 
 
 # --- 5. Main Analysis Loop ---
-cat("\n--- Starting Power Analysis & Plot Generation ---\n")
+cat("\n--- Starting Comprehensive Analysis ---\n")
 all_results <- list()
-all_plots <- list()
+all_plain_plots <- list()
+all_mixture_plots <- list()
 
-# Iterate through the antigen map, not the dataframe columns
+# Iterate through the antigen map
 for (i in 1:nrow(antigen_map)) {
   ab_name <- antigen_map$short_name[i]
   hard_cutoff <- antigen_map$threshold[i]
@@ -193,47 +215,77 @@ for (i in 1:nrow(antigen_map)) {
     next
   }
   
+  # Create plain histogram
+  plain_plot <- plot_plain_histogram(titres, hard_cutoff, ab_name)
+  all_plain_plots[[ab_name]] <- plain_plot
+  
+  # Fit mixture model and create diagnostic plot
   titres_log <- log(titres[titres > 0])
   fit <- fit_skew_mix(titres_log)
   
-  plot <- plot_mixture_diagnosis(titres, fit, hard_cutoff, ab_name)
-  if (!is.null(plot)) all_plots[[ab_name]] <- plot
+  mixture_plot <- plot_mixture_diagnosis(titres, fit, hard_cutoff, ab_name)
+  if (!is.null(mixture_plot)) all_mixture_plots[[ab_name]] <- mixture_plot
   
   if (is.null(fit)) {
     cat("  -> Mixture model failed to converge. Skipping stats.\n")
     next
   }
   
+  # Calculate power statistics
   pos_component <- which.max(fit$mu)
   stats <- lambda_stats(fit, pos_component, log(hard_cutoff))
   all_results[[ab_name]] <- stats %>% mutate(Antibody = ab_name, .before = 1)
 }
 
 
-# --- 6. Report Final Results & Save Paginated Plots ---
-if (length(all_results) > 0) {
-  summary_table <- bind_rows(all_results) %>% arrange(desc(Inflation_Factor))
-  cat("\n\n--- Power Analysis Summary ---\n\n")
-  print(summary_table, n = 50)
-  cat("\n* Inflation_Factor: Estimated power loss from using a hard cutoff.\n")
-} else {
-  cat("\nAnalysis complete, but no results were generated.\n")
-}
+# --- 6. Generate and Save Plots ---
 
-if (length(all_plots) > 0) {
-  cat("\nSaving", length(all_plots), "diagnostic plots to paginated PDF...\n")
+# Save plain histograms
+if (length(all_plain_plots) > 0) {
+  cat("\nSaving", length(all_plain_plots), "plain histograms to PDF...\n")
   plots_per_page <- 8
+  sorted_plots <- all_plain_plots[order(names(all_plain_plots))]
   
-  # Sort plots by name to keep them in a consistent order
-  sorted_plots <- all_plots[order(names(all_plots))]
-  
-  # Create a multi-page PDF
-  pdf("serology_diagnostic_plots.pdf", width = 14, height = 14)
+  pdf("ukb_antibody_distributions_final.pdf", width = 14, height = 14)
   for (i in seq(1, length(sorted_plots), by = plots_per_page)) {
     page_plot_list <- sorted_plots[i:min(i + plots_per_page - 1, length(sorted_plots))]
     combined_page <- wrap_plots(page_plot_list, ncol = 2)
     print(combined_page)
   }
   dev.off()
-  cat("Diagnostic plots saved to 'serology_diagnostic_plots.pdf'\n")
-} 
+  cat("Plain histograms saved to 'ukb_antibody_distributions_final.pdf'\n")
+}
+
+# Save mixture model diagnostic plots
+if (length(all_mixture_plots) > 0) {
+  cat("\nSaving", length(all_mixture_plots), "mixture model diagnostic plots to PDF...\n")
+  sorted_mixture_plots <- all_mixture_plots[order(names(all_mixture_plots))]
+  
+  pdf("serology_diagnostic_plots.pdf", width = 14, height = 14)
+  for (i in seq(1, length(sorted_mixture_plots), by = plots_per_page)) {
+    page_plot_list <- sorted_mixture_plots[i:min(i + plots_per_page - 1, length(sorted_mixture_plots))]
+    combined_page <- wrap_plots(page_plot_list, ncol = 2)
+    print(combined_page)
+  }
+  dev.off()
+  cat("Mixture model diagnostic plots saved to 'serology_diagnostic_plots.pdf'\n")
+}
+
+
+# --- 7. Report Final Results ---
+if (length(all_results) > 0) {
+  summary_table <- bind_rows(all_results) %>% arrange(desc(Inflation_Factor))
+  cat("\n\n--- Power Analysis Summary ---\n\n")
+  print(summary_table, n = 50)
+  cat("\n* Inflation_Factor: Estimated power loss from using a hard cutoff.\n")
+  cat("* Lambda: Classification accuracy (Se + Sp - 1).\n")
+  cat("* Higher Inflation_Factor = Greater power gain from mixture model.\n")
+} else {
+  cat("\nAnalysis complete, but no results were generated.\n")
+}
+
+cat("\n--- Analysis Complete ---\n")
+cat("Files created:\n")
+cat("- ukb_antibody_distributions_final.pdf: Plain histograms with cutoffs\n")
+cat("- serology_diagnostic_plots.pdf: Mixture model fitted histograms\n")
+cat("- Power analysis results printed above\n") 
