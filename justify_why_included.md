@@ -97,20 +97,96 @@ This document provides detailed justification for the selection of specific anti
 - **Rationale:** Multiple genetic associations outside MHC, important protozoal pathogen
 - **Expected Power Gain:** High - clear genetic signal with good distribution
 
+### Polyomaviruses
+
+#### bkv_vp1
+- **Threshold:** 250
+- **Butler-Laporte Evidence:** rs492602 (chr19, P=4.3e-09) in FUT2
+- **Rationale:** Strongest FUT2 association, important for polyomavirus family
+- **Expected Power Gain:** High - clear genetic signal with FUT2
+
+#### jcv_vp1
+- **Threshold:** 250
+- **Butler-Laporte Evidence:** rs2432132 (chr19, P=8.8e-15) in FUT2
+- **Rationale:** Additional FUT2 association, different from BKV
+- **Expected Power Gain:** High - strong genetic signal
+
+#### mcv_vp1
+- **Threshold:** 250
+- **Butler-Laporte Evidence:** rs55792153 (chr5, P=3.6e-10) near TMEM173
+- **Rationale:** TMEM173 association, important for polyomavirus family
+- **Expected Power Gain:** Moderate - good genetic signal
+
+### Additional Herpesviruses
+
+#### vzv
+- **Threshold:** 100
+- **Butler-Laporte Evidence:** Multiple MHC hits including rs1766 (chr6, P=1.1e-11) in HLA-DQB1
+- **Rationale:** Strong MHC associations, important herpesvirus
+- **Expected Power Gain:** Moderate - good distribution but mainly MHC signal
+
+#### hhv6_ie1a
+- **Threshold:** 100
+- **Butler-Laporte Evidence:** rs13079586 (chr3, P=4.6e-08) near ITGA9
+- **Rationale:** Clear genetic signal outside MHC, good distribution
+- **Expected Power Gain:** High - non-MHC genetic control
+
+#### hhv6_ie1b
+- **Threshold:** 100
+- **Butler-Laporte Evidence:** rs28752523 (chr6, P=7.9e-09) in HLA-DQA1
+- **Rationale:** MHC association, additional HHV-6 antigen
+- **Expected Power Gain:** Moderate - MHC genetics
+
+#### hhv7_u14
+- **Threshold:** 100
+- **Butler-Laporte Evidence:** rs139299944 (chr6, P=4.1e-12) in HLA-DQA1
+- **Rationale:** Strong MHC association, high prevalence (~95%)
+- **Expected Power Gain:** Moderate - strong MHC signal
+
+### Chlamydia trachomatis
+
+#### ct_pgp3
+- **Threshold:** 200
+- **Butler-Laporte Evidence:** Chr7:66874490 (P=4.2e-08) near AC006480.1
+- **Rationale:** Bacterial pathogen representation, clear genetic signal
+- **Expected Power Gain:** Moderate - good for bacterial pathogens
+
+### Additional H. pylori Antigens
+
+#### hp_caga
+- **Threshold:** 400
+- **Butler-Laporte Evidence:** No specific hits in Table 2
+- **Rationale:** Important virulence factor, high threshold may reduce misclassification
+- **Expected Power Gain:** Low - high threshold reduces power gain potential
+
+#### hp_vaca
+- **Threshold:** 100
+- **Butler-Laporte Evidence:** No specific hits in Table 2
+- **Rationale:** Additional H. pylori antigen, lower threshold
+- **Expected Power Gain:** Moderate - good for bacterial pathogen representation
+
+#### toxo_p22
+- **Threshold:** 100
+- **Butler-Laporte Evidence:** No specific hits in Table 2
+- **Rationale:** Additional T. gondii antigen, lower threshold
+- **Expected Power Gain:** Moderate - good for protozoal pathogen representation
+
 ## Excluded Antigens
 
-### VZV (Varicella Zoster Virus)
-- **Reason:** Strong MHC associations but limited non-MHC genetic signal
-- **Butler-Laporte Evidence:** Multiple MHC hits but no clear non-MHC associations
+### Chlamydia trachomatis (Additional antigens)
+- **Reason:** Limited genetic signal for most antigens beyond pGP3
+- **Butler-Laporte Evidence:** Only pGP3 shows clear genetic signal
+- **Note:** momp A, momp D, tarp-D F1, tarp-D F2, PorB included for completeness but low priority
 
-### JCV/BKV (Polyomaviruses)
-- **Reason:** Strong FUT2 associations but not included in current antigen map
-- **Butler-Laporte Evidence:** rs492602 (BKV, P=4.3e-09) and rs2432132 (JCV, P=8.8e-15) both in FUT2
-- **Recommendation:** Add if VP1 antigens are available in UKB data
+### H. pylori (Additional antigens)
+- **Reason:** Limited genetic signal for some antigens
+- **Butler-Laporte Evidence:** Only OMP and UreA show clear genetic signals
+- **Note:** CagA, VacA, GroEL, Catalase included for completeness but lower priority
 
-### MCV (Merkel Cell Polyomavirus)
-- **Reason:** Limited genetic signal outside MHC
-- **Butler-Laporte Evidence:** Mainly MHC associations, weaker non-MHC signal
+### T. gondii p22
+- **Reason:** Limited genetic signal compared to sag1
+- **Butler-Laporte Evidence:** No specific hits in Table 2
+- **Note:** Included for completeness but sag1 is the primary T. gondii antigen
 
 ## Summary
 

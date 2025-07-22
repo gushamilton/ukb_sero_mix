@@ -33,6 +33,20 @@ antigen_map <- tribble(
   "cmv_pp52", "pp 52 antigen for Human Cytomegalovirus | Instance 0", 150,
   "cmv_pp28", "pp 28 antigen for Human Cytomegalovirus | Instance 0", 200,
   "vzv", "gE / gI antigen for Varicella Zoster Virus  | Instance 0", 100,
+  "hhv6_ie1a", "p101 k antigen for Human Herpesvirus-6 | Instance 0", 100,
+  "hhv6_ie1b", "p101 k antigen for Human Herpesvirus-6 | Instance 0", 100,
+  "hhv7_u14", "U14 antigen for Human Herpesvirus-7 | Instance 0", 100,
+  # Polyomaviridae
+  "bkv_vp1", "BK VP1 antigen for Human Polyomavirus BKV | Instance 0", 250,
+  "jcv_vp1", "JC VP1 antigen for Human Polyomavirus JCV | Instance 0", 250,
+  "mcv_vp1", "MC VP1 antigen for Merkel Cell Polyomavirus | Instance 0", 250,
+  # Bacteria
+  "ct_mompa", "momp A antigen for Chlamydia trachomatis | Instance 0", 100,
+  "ct_mompd", "momp D antigen for Chlamydia trachomatis | Instance 0", 100,
+  "ct_tarpf1", "tarp-D F1 antigen for Chlamydia trachomatis | Instance 0", 100,
+  "ct_tarpf2", "tarp-D F2 antigen for Chlamydia trachomatis | Instance 0", 100,
+  "ct_porb", "PorB antigen for Chlamydia trachomatis | Instance 0", 80,
+  "ct_pgp3", "pGP3 antigen for Chlamydia trachomatis | Instance 0", 200,
   # H. pylori
   "hp_caga", "CagA antigen for Helicobacter pylori | Instance 0", 400,
   "hp_vaca", "VacA antigen for Helicobacter pylori | Instance 0", 100,
