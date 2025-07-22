@@ -11,7 +11,10 @@
 
 # --- 1. SETUP & CONFIGURATION ---
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(tidyverse, mixsmsn, sn, here, glue, pheatmap)
+pacman::p_load(tidyverse, mixsmsn, sn, here, glue, pheatmap, furrr)
+
+# Setup parallel processing
+plan(multisession, workers = availableCores() - 1)
 
 # Ensure the output directory exists
 if (!dir.exists("quickdraws_input")) dir.create("quickdraws_input")
@@ -182,7 +185,7 @@ args_for_pmap <- map(args_for_pmap, ~ .x[is_present])
 
 # Process all antigens in parallel using pmap
 # It returns a list of tibbles, one for each successfully processed antigen
-list_of_pheno_tibbles <- pmap(args_for_pmap, process_antigen)
+list_of_pheno_tibbles <- future_pmap(args_for_pmap, process_antigen, .options = furrr_options(seed = TRUE))
 
 # Filter out NULLs from failed fits and prepend the base FID/IID tibble
 # The base tibble ensures all samples are kept, even if some have no phenotype data
@@ -197,29 +200,55 @@ master_pheno_table <- reduce(all_valid_tibbles, left_join, by = c("FID", "IID"))
 cat("Master phenotype table generated with", ncol(master_pheno_table) - 2, "columns.\n")
 
 
-# --- 5. GENERATE PC1_neg COVARIATE ---
-cat("\n--- Generating PC1_neg Covariate ---\n")
+# --- 5. GENERATE PC1_assay_noise COVARIATE (IMPROVED LOGIC) ---
+cat("\n--- Generating PC1_assay_noise Covariate ---\n")
 
-# Create the matrix of seronegative probabilities
-p_neg_matrix <- master_pheno_table %>%
-  select(FID, IID, ends_with("_p_neg")) %>%
-  column_to_rownames("IID") %>%
-  select(-FID) %>%
+# Start with a matrix of the raw IgG levels for all core antigens
+igg_levels_matrix <- master_pheno_table %>% 
+    select(FID, IID, ends_with("_IgG_raw"))
+
+# For each antigen, set the IgG level to NA for individuals who are NOT confidently seronegative
+# A "confident negative" is defined as p_soft < 0.1
+for (ab_name in core_antigens) {
+    igg_col <- glue("{ab_name}_IgG_raw")
+    soft_col <- glue("{ab_name}_sero_soft")
+
+    if (all(c(igg_col, soft_col) %in% names(master_pheno_table))) {
+        # Get indices of individuals who are NOT confident negatives
+        idx_to_mask <- which(master_pheno_table[[soft_col]] >= 0.1)
+        if (length(idx_to_mask) > 0) {
+            igg_levels_matrix[idx_to_mask, igg_col] <- NA
+        }
+    }
+}
+
+# Now, prepare the matrix for PCA: numeric, with IID as rownames
+pca_input_matrix <- igg_levels_matrix %>%
+  select(-any_of(c("FID", "IID"))) %>%
+  # drop antigens that failed and dont exist in the master table
+  select(any_of(glue("{core_antigens}_IgG_raw"))) %>% 
   as.matrix()
 
-# Impute missing values (e.g., from failed fits) with the column mean
-for(j in 1:ncol(p_neg_matrix)){
-    p_neg_matrix[is.na(p_neg_matrix[,j]), j] <- mean(p_neg_matrix[,j], na.rm = TRUE)
+# Impute the remaining NAs (column-wise) using the mean of the confident negatives for that antigen
+for(j in 1:ncol(pca_input_matrix)){
+    col_mean <- mean(pca_input_matrix[,j], na.rm = TRUE)
+    if (is.finite(col_mean)) {
+      pca_input_matrix[is.na(pca_input_matrix[,j]), j] <- col_mean
+    } else {
+      # If all values are NA (shouldn't happen), fill with 0
+      pca_input_matrix[,j] <- 0
+    }
 }
 
 # Run PCA
-pca_results <- prcomp(p_neg_matrix, center = TRUE, scale. = TRUE)
-pc1_neg_df <- pca_results$x %>%
-  as_tibble(rownames = "IID") %>%
-  select(IID, PC1_neg = PC1) %>%
-  mutate(IID = as.integer(IID))
+pca_results <- prcomp(pca_input_matrix, center = TRUE, scale. = TRUE)
+pc1_assay_noise_df <- pca_results$x %>%
+  as_tibble() %>%
+  select(PC1_assay_noise = PC1) %>%
+  bind_cols(select(data_clean, IID), .)
 
-cat("PC1_neg explains", round(summary(pca_results)$importance[2,1] * 100, 2), "% of variance.\n")
+variance_explained <- summary(pca_results)$importance["Proportion of Variance", "PC1"]
+cat("PC1_assay_noise explains", round(variance_explained * 100, 2), "% of variance in seronegative IgG levels.\n")
 
 
 # --- 6. CREATE QUICKDRAWS INPUT FILES ---
@@ -228,13 +257,13 @@ cat("\n--- Writing Quickdraws Input Files ---\n")
 # 6a. Master Covariate File
 # NOTE: This assumes `age_sex.txt` and `ukb_pcs.txt` are in the parent directory.
 # You may need to adjust paths for your environment.
-covar_base <- read_tsv("../03_quickdraw_gwas/age_sex.txt")
+covar_base <- read_tsv("age_sex.txt")
 pcs_base <- read_tsv("../pcs.txt") # Placeholder for PCs 1-20
 
 master_covar_table <- covar_base %>%
   left_join(pcs_base, by = c("FID", "IID")) %>%
-  left_join(pc1_neg_df, by = "IID") %>%
-  select(FID, IID, age, sex, starts_with("PC"), PC1_neg)
+  left_join(pc1_assay_noise_df, by = "IID") %>%
+  select(FID, IID, age, sex, starts_with("PC"), PC1_assay_noise)
 
 write_tsv(master_covar_table, "quickdraws_input/covariates_master.tsv")
 cat("  -> Wrote master covariate file: quickdraws_input/covariates_master.tsv\n")
@@ -281,11 +310,11 @@ write_tsv(manifest_df, "quickdraws_input/analysis_manifest.tsv")
 cat("  -> Wrote", nrow(manifest_df), "weight files and analysis manifest.\n")
 
 
-# --- 7. QC & REPORTING on PC1_neg ---
-cat("\n--- QC for PC1_neg ---\n")
+# --- 7. QC & REPORTING on PC1_assay_noise ---
+cat("\n--- QC for PC1_assay_noise ---\n")
 cor_matrix <- cor(
     master_pheno_table %>% select(ends_with("_IgG_raw")),
-    pc1_neg_df$PC1_neg,
+    pc1_assay_noise_df$PC1_assay_noise,
     use = "pairwise.complete.obs"
 )
 
@@ -294,19 +323,19 @@ cor_df <- as_tibble(cor_matrix, rownames = "Antigen") %>%
     mutate(Antigen = str_remove(Antigen, "_IgG_raw")) %>%
     arrange(desc(abs(Correlation)))
 
-cat("Top 5 correlations with PC1_neg:\n")
+cat("Top 5 correlations with PC1_assay_noise:\n")
 print(head(cor_df, 5))
 
 p <- ggplot(cor_df, aes(x = Correlation, y = reorder(Antigen, Correlation))) +
     geom_col(fill = "steelblue") +
     labs(
-        title = "Correlation of PC1_neg with Raw log-MFI of Each Antigen",
-        subtitle = "PC1_neg captures shared variance in seronegativity",
+        title = "Correlation of PC1_assay_noise with Raw log-MFI of Each Antigen",
+        subtitle = "PC1 from IgG levels of seronegatives, representing shared assay noise",
         x = "Pearson Correlation", y = "Antigen"
     ) +
     theme_light()
 
-ggsave("quickdraws_input/pc1_neg_correlation_plot.pdf", p, width = 8, height = 10)
-cat("  -> Saved PC1_neg correlation plot.\n")
+ggsave("quickdraws_input/pc1_assay_noise_correlation_plot.pdf", p, width = 8, height = 10)
+cat("  -> Saved PC1_assay_noise correlation plot.\n")
 
 cat("\n--- Phenotype Generation Complete ---\n") 
