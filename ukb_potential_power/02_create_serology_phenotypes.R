@@ -255,10 +255,42 @@ cat("PC1_assay_noise explains", round(variance_explained * 100, 2), "% of varian
 cat("\n--- Writing Quickdraws Input Files ---\n")
 
 # 6a. Master Covariate File
-# NOTE: This assumes `age_sex.txt` and `ukb_pcs.txt` are in the parent directory.
+# NOTE: This assumes `age_sex.txt` and `covariates.txt` are in the working directory.
 # You may need to adjust paths for your environment.
-covar_base <- read_tsv("age_sex.txt")
-pcs_base <- read_tsv("../pcs.txt") # Placeholder for PCs 1-20
+
+# Debug: Let's see what we're actually reading
+cat("Reading age_sex.txt...\n")
+covar_base <- read_delim("age_sex.txt", delim = "\t", show_col_types = FALSE)
+cat("age_sex.txt columns:", paste(names(covar_base), collapse = ", "), "\n")
+
+cat("Reading covariates.txt...\n")
+# Try different approaches for covariates.txt
+tryCatch({
+  pcs_base <- read_delim("covariates.txt", delim = " ", show_col_types = FALSE)
+}, error = function(e) {
+  cat("Failed to read with space delimiter, trying tab...\n")
+  pcs_base <<- read_delim("covariates.txt", delim = "\t", show_col_types = FALSE)
+})
+
+cat("covariates.txt columns:", paste(names(pcs_base), collapse = ", "), "\n")
+cat("First few rows of covariates.txt:\n")
+print(head(pcs_base, 3))
+
+# Ensure we have the expected column names
+if (!all(c("FID", "IID") %in% names(covar_base))) {
+  stop("age_sex.txt must contain FID and IID columns")
+}
+
+if (!all(c("FID", "IID") %in% names(pcs_base))) {
+  stop("covariates.txt must contain FID and IID columns")
+}
+
+# Check if we have the PC columns
+pc_cols <- paste0("PC", 1:20)
+missing_pcs <- setdiff(pc_cols, names(pcs_base))
+if (length(missing_pcs) > 0) {
+  warning("Missing PC columns: ", paste(missing_pcs, collapse = ", "))
+}
 
 master_covar_table <- covar_base %>%
   left_join(pcs_base, by = c("FID", "IID")) %>%
