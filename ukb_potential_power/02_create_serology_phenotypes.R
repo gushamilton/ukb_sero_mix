@@ -126,73 +126,73 @@ fit_skew_mix <- function(y) {
 #' @param antigen_short_name The short name of the antigen (e.g., "cmv_pp150").
 #' @param mfi_data A tibble with FID, IID, and a column for the MFI values.
 #' @param threshold The official hard seropositivity threshold.
-#' @return A tibble with FID, IID, and all generated phenotype/weight columns.
+#' @return A tibble with FID, IID, and all generated phenotype/weight columns, or NULL on failure.
 process_antigen <- function(antigen_short_name, mfi_data, threshold) {
   cat("  -> Processing:", antigen_short_name, "\n")
   titres <- mfi_data[[antigen_short_name]]
-  # Indices of valid (positive) MFI values
+  
+  # Indices of valid (positive) MFI values for model fitting
   idx_valid <- which(titres > 0 & is.finite(titres))
   if (length(idx_valid) < 200) {
-    warning("Not enough data for ", antigen_short_name)
+    warning("Not enough valid data points for ", antigen_short_name, ". Skipping.")
     return(NULL)
   }
   
   # Fit model on log-transformed valid titres
   fit <- fit_skew_mix(titres[idx_valid])
-  if (is.null(fit)) return(NULL)
+  if (is.null(fit)) {
+    warning("Mixture model failed for ", antigen_short_name, ". Skipping.")
+    return(NULL)
+  }
+  
   pos_comp <- which.max(fit$mu)
   
-  # Initialise p_soft vector with NA and fill where we have a fit
+  # Initialise a full-length vector for posterior probabilities
   p_soft_vec <- rep(NA_real_, length(titres))
+  # Fill in the probabilities only for the samples used in the fit
   p_soft_vec[idx_valid] <- fit$obs.prob[, pos_comp]
   
-  # Build output tibble with new columns
-  out <- mfi_data %>%
-    mutate(
-      !!glue("{antigen_short_name}_IgG_raw") := log(titres),
-      !!glue("{antigen_short_name}_sero_hard") := if_else(titres >= threshold, 1, 0),
-      !!glue("{antigen_short_name}_sero_soft") := p_soft_vec,
-      !!glue("{antigen_short_name}_p_neg") := 1 - p_soft_vec,
-      !!glue("{antigen_short_name}_w_hard") := 2 * abs(p_soft_vec - 0.5),
-      !!glue("{antigen_short_name}_w_igg") := p_soft_vec
-    )
-  return(out)
+  # Build and return a clean tibble with only the new columns
+  tibble(
+    FID = mfi_data$FID,
+    IID = mfi_data$IID,
+    !!glue("{antigen_short_name}_IgG_raw")   := log(titres),
+    !!glue("{antigen_short_name}_sero_hard") := if_else(titres >= threshold, 1, 0, missing = 0),
+    !!glue("{antigen_short_name}_sero_soft") := p_soft_vec,
+    !!glue("{antigen_short_name}_p_neg")     := 1 - p_soft_vec,
+    !!glue("{antigen_short_name}_w_hard")    := 2 * abs(p_soft_vec - 0.5),
+    !!glue("{antigen_short_name}_w_igg")     := p_soft_vec
+  )
 }
 
 
-# --- 4. MAIN ANALYSIS LOOP ---
+# --- 4. MAIN ANALYSIS LOOP (PARALLELIZED) ---
 cat("\n--- Starting Phenotype Generation ---\n")
 
-# Create a list of arguments for each antigen
-antigen_args <- antigen_map %>%
-  filter(short_name %in% names(data_clean)) %>%
-  mutate(
-    mfi_data = map(short_name, ~select(data_clean, FID, IID, !!sym(.x)))
-  ) %>%
-  select(antigen_short_name = short_name, mfi_data, threshold)
+# Prepare a list of arguments for pmap
+args_for_pmap <- list(
+  antigen_short_name = antigen_map$short_name,
+  mfi_data = map(antigen_map$short_name, ~select(data_clean, FID, IID, all_of(.x))),
+  threshold = antigen_map$threshold
+)
 
-# Process all antigens in parallel
-antigen_results <- map_dfr(antigen_args$antigen_short_name, function(ab_name) {
-  idx <- which(antigen_args$antigen_short_name == ab_name)
-  antigen_phenos <- process_antigen(
-    ab_name, 
-    antigen_args$mfi_data[[idx]], 
-    antigen_args$threshold[idx]
-  )
-  
-  if (!is.null(antigen_phenos)) {
-    select(antigen_phenos, -starts_with("p_soft"), -!!sym(ab_name))
-  } else {
-    NULL
-  }
-}, .id = "antigen")
+# Filter for antigens actually present in the data
+is_present <- antigen_map$short_name %in% names(data_clean)
+args_for_pmap <- map(args_for_pmap, ~ .x[is_present])
 
-# Combine all generated phenotypes into a single master tibble
-master_pheno_table <- antigen_results %>%
-  select(-antigen) %>%
-  bind_rows(select(data_clean, FID, IID), .) %>%
-  group_by(FID, IID) %>%
-  summarise(across(everything(), ~first(na.omit(.))), .groups = "drop")
+# Process all antigens in parallel using pmap
+# It returns a list of tibbles, one for each successfully processed antigen
+list_of_pheno_tibbles <- pmap(args_for_pmap, process_antigen)
+
+# Filter out NULLs from failed fits and prepend the base FID/IID tibble
+# The base tibble ensures all samples are kept, even if some have no phenotype data
+all_valid_tibbles <- c(
+    list(select(data_clean, FID, IID)), 
+    compact(list_of_pheno_tibbles) # purrr::compact removes NULLs
+)
+
+# Combine all generated phenotypes into a single master tibble by joining on FID/IID
+master_pheno_table <- reduce(all_valid_tibbles, left_join, by = c("FID", "IID"))
 
 cat("Master phenotype table generated with", ncol(master_pheno_table) - 2, "columns.\n")
 
