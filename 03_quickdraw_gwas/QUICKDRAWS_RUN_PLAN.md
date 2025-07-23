@@ -18,14 +18,14 @@ For each of the 24 antigens the phenotype-generation script outputs **four base 
 | `{ab}_sero_hard`         | binary      | 0/1 by official cutoff | Classic case/control replication of Butler-Laporte et al. *(β-effect)* |
 | `{ab}_w_hard.weights`    | weight file | weight = `2·|p_soft−0.5|` | Emphasises confident cases/controls |
 | `{ab}_sero_soft`         | quantitative| posterior `p_soft∈[0,1]` | Soft serostatus, maximises power *(β)* |
-| `{ab}_IgG_pos.weights`   | weight file | weight = `sero_hard` (0/1) | **NEW** — replicates Butler-Laporte IgG analysis restricted to hard-positives |
+| `{ab}_IgG_seropos_only`  | quantitative| IgG levels only in seropositives (NA for seronegatives) | **NEW** — replicates Butler-Laporte IgG analysis restricted to hard-positives |
 
 ### Analysis grid we will run
 
 | ID | Phenotype column | Model in QD | Weights? | Rationale |
 |----|------------------|-------------|----------|-----------|
 | A  | `{ab}_sero_hard` | logistic    | none     | Direct replication of previous binary GWAS |
-| B  | `{ab}_IgG_raw`   | linear      | `{ab}_IgG_pos.weights` | IgG analysed **only in hard seropositives** (weight = sero_hard); Butler-Laporte quantitative scan |
+| B  | `{ab}_IgG_seropos_only` | linear      | none     | IgG analysed **only in hard seropositives** (NA for seronegatives); Butler-Laporte quantitative scan |
 | C  | `{ab}_IgG_raw`   | linear      | `{ab}_IgG_wgt.weights` | IgG weighted by p; extends B into probabilistic space |
 | D1 | `{ab}_sero_hard` | logistic    | `{ab}_p_soft.weights` | Weight = p; **statistically equivalent (score-test) to E** – compares logistic vs linear implementations |
 | D2 | `{ab}_sero_hard` | logistic    | `{ab}_w_hard.weights` | Weight = 2·|p−0.5|; focuses on confident cases & controls |
@@ -93,9 +93,12 @@ The output directory `step1/` contains the fitted null models shared by every do
 
 | phenotype_name          | analysis_type | weights_file              |
 |-------------------------|---------------|---------------------------|
-| cmv_pp150_IgG_raw       | linear        | NA                        |
+| cmv_pp150_sero_hard     | logistic      | NA                        |
+| cmv_pp150_IgG_seropos_only | linear    | NA                        |
 | cmv_pp150_IgG_raw       | linear        | cmv_pp150_IgG_wgt.weights |
+| cmv_pp150_sero_hard     | logistic      | cmv_pp150_p_soft.weights  |
 | cmv_pp150_sero_hard     | logistic      | cmv_pp150_sero_hard.weights |
+| cmv_pp150_sero_soft     | linear        | NA                        |
 | ⋯                       | ⋯             | ⋯                         |
 
 Any row where `weights_file = NA` is an *unweighted* analysis; otherwise the weights are passed with `--weightsFile`.

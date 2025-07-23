@@ -396,8 +396,8 @@ cat("  -> Wrote master covariate file (no extra PC1 covars): quickdraws_input/co
 # 6b. Phenotype and Weights Files
 pheno_cols <- master_pheno_table %>% select(-ends_with("_w_hard"), -ends_with("_w_igg"), -ends_with("_p_neg"))
 
-# Split quantitative (IgG + sero_soft) and binary (sero_hard) phenotypes
-phenos_quant <- pheno_cols %>% select(FID, IID, matches("_IgG_raw$|_sero_soft$"))
+# Split quantitative (IgG + sero_soft + IgG_seropos_only) and binary (sero_hard) phenotypes
+phenos_quant <- pheno_cols %>% select(FID, IID, matches("_IgG_raw$|_IgG_seropos_only$|_sero_soft$"))
 phenos_binary <- pheno_cols %>% select(FID, IID, matches("_sero_hard$"))
 
 write_tsv(phenos_quant, "quickdraws_input/phenotypes_quantitative.tsv")
@@ -412,31 +412,37 @@ cat("  -> Wrote master phenotype file (all traits): quickdraws_input/phenotypes_
 analysis_manifest <- list()
 
 for (ab in core_antigens) {
-    # Analysis B: IgG Raw restricted to hard seropositives (IgG_pos weights)
+    # Create Butler-Laporte style IgG phenotype: IgG levels only in seropositives (NA for seronegatives)
+    igg_seropos_only <- master_pheno_table %>%
+        mutate(!!glue("{ab}_IgG_seropos_only") := if_else(!!sym(glue("{ab}_sero_hard")) == 1, !!sym(glue("{ab}_IgG_raw")), NA_real_))
+    
+    # Update master_pheno_table with the new filtered phenotype
+    master_pheno_table <- master_pheno_table %>%
+        mutate(!!glue("{ab}_IgG_seropos_only") := igg_seropos_only[[glue("{ab}_IgG_seropos_only")]])
+    
+    # Analysis A: Classic binary serostatus (unweighted)
+    analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_sero_hard"), analysis_type = "logistic", weights_file = NA)
+    
+    # Analysis B: Butler-Laporte IgG analysis (IgG only in seropositives, unweighted)
+    analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_IgG_seropos_only"), analysis_type = "linear", weights_file = NA)
+    
+    # Analysis C: IgG Raw with p_soft weights (probabilistic weighting)
     weights_igg <- master_pheno_table %>% select(FID, IID, Weight = !!glue("{ab}_w_igg"))
     write_tsv(weights_igg, glue("quickdraws_input/{ab}_IgG_wgt.weights"), col_names = TRUE)
-
-    # Write existing IgG_wgt row (Analysis C)
     analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_IgG_raw"), analysis_type = "linear", weights_file = glue("{ab}_IgG_wgt.weights"))
-
-    # IgG Raw with hard-positive weights (Analysis B)
-    analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_IgG_raw"), analysis_type = "linear", weights_file = glue("{ab}_IgG_pos.weights"))
- 
-    # Sero Hard (with weights)
-    weights_hard <- master_pheno_table %>% select(FID, IID, Weight = !!glue("{ab}_w_hard"))
-    write_tsv(weights_hard, glue("quickdraws_input/{ab}_sero_hard.weights"), col_names = TRUE)
-    analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_sero_hard"), analysis_type = "logistic", weights_file = glue("{ab}_sero_hard.weights")) # D2
-
-    # Sero Hard UNweighted (Analysis A)
-    analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_sero_hard"), analysis_type = "logistic", weights_file = NA)
-
-    # Sero Hard with p_soft weights (Analysis D1)
+    
+    # Analysis D1: Sero Hard with p_soft weights
     weights_psoft <- master_pheno_table %>% select(FID, IID, Weight = !!glue("{ab}_sero_soft"))
     write_tsv(weights_psoft, glue("quickdraws_input/{ab}_p_soft.weights"), col_names = TRUE)
     analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_sero_hard"), analysis_type = "logistic", weights_file = glue("{ab}_p_soft.weights"))
- 
-    # Sero Soft (no weights)
-    analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_sero_soft"), analysis_type = "linear", weights_file = NA) # E
+    
+    # Analysis D2: Sero Hard with hard weights (emphasize confident cases/controls)
+    weights_hard <- master_pheno_table %>% select(FID, IID, Weight = !!glue("{ab}_w_hard"))
+    write_tsv(weights_hard, glue("quickdraws_input/{ab}_sero_hard.weights"), col_names = TRUE)
+    analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_sero_hard"), analysis_type = "logistic", weights_file = glue("{ab}_sero_hard.weights"))
+    
+    # Analysis E: Sero Soft (quantitative, unweighted)
+    analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_sero_soft"), analysis_type = "linear", weights_file = NA)
 }
 
 manifest_df <- bind_rows(analysis_manifest)
@@ -452,14 +458,13 @@ if (!dir.exists(step2_dir)) dir.create(step2_dir)
 # Write one covariate file (identical for all analyses)
 write_tsv(master_covar_table, file.path(step2_dir, "covariates_master.tsv"))
 
-# Create minimal phenotype files
+# Create minimal phenotype files - NOW after all phenotypes are created
 for (row_idx in seq_len(nrow(manifest_df))) {
   pheno_name <- manifest_df$phenotype_name[row_idx]
   pheno_file <- file.path(step2_dir, glue("{pheno_name}.phen.tsv"))
-  if (!file.exists(pheno_file)) {
-    tmp <- master_pheno_table %>% select(FID, IID, all_of(pheno_name))
-    write_tsv(tmp, pheno_file)
-  }
+  # Remove the file.exists check since we want to create/overwrite all files
+  tmp <- master_pheno_table %>% select(FID, IID, all_of(pheno_name))
+  write_tsv(tmp, pheno_file)
 }
 cat("  -> Wrote minimal phenotype files to", step2_dir, "\n")
 
