@@ -129,7 +129,7 @@ fit_skew_mix <- function(y) {
 #' @param antigen_short_name The short name of the antigen (e.g., "cmv_pp150").
 #' @param mfi_data A tibble with FID, IID, and a column for the MFI values.
 #' @param threshold The official hard seropositivity threshold.
-#' @return A tibble with FID, IID, and all generated phenotype/weight columns, or NULL on failure.
+#' @return A list containing the phenotype tibble and the mixture model fit, or NULL on failure.
 process_antigen <- function(antigen_short_name, mfi_data, threshold) {
   cat("  -> Processing:", antigen_short_name, "\n")
   titres <- mfi_data[[antigen_short_name]]
@@ -155,8 +155,8 @@ process_antigen <- function(antigen_short_name, mfi_data, threshold) {
   # Fill in the probabilities only for the samples used in the fit
   p_soft_vec[idx_valid] <- fit$obs.prob[, pos_comp]
   
-  # Build and return a clean tibble with only the new columns
-  tibble(
+  # Build the phenotype tibble
+  pheno_tibble <- tibble(
     FID = mfi_data$FID,
     IID = mfi_data$IID,
     !!glue("{antigen_short_name}_IgG_raw")   := log(titres),
@@ -165,6 +165,15 @@ process_antigen <- function(antigen_short_name, mfi_data, threshold) {
     !!glue("{antigen_short_name}_p_neg")     := 1 - p_soft_vec,
     !!glue("{antigen_short_name}_w_hard")    := 2 * abs(p_soft_vec - 0.5),
     !!glue("{antigen_short_name}_w_igg")     := p_soft_vec
+  )
+  
+  # Return both phenotype data and model fit
+  list(
+    phenotypes = pheno_tibble,
+    model_fit = fit,
+    antigen_name = antigen_short_name,
+    threshold = threshold,
+    idx_valid = idx_valid
   )
 }
 
@@ -184,14 +193,26 @@ is_present <- antigen_map$short_name %in% names(data_clean)
 args_for_pmap <- map(args_for_pmap, ~ .x[is_present])
 
 # Process all antigens in parallel using pmap
-# It returns a list of tibbles, one for each successfully processed antigen
-list_of_pheno_tibbles <- future_pmap(args_for_pmap, process_antigen, .options = furrr_options(seed = TRUE))
+# It returns a list of lists, one for each successfully processed antigen
+list_of_results <- future_pmap(args_for_pmap, process_antigen, .options = furrr_options(seed = TRUE))
+
+# Filter out NULLs from failed fits
+valid_results <- compact(list_of_results)
+
+# Extract phenotype tibbles and model fits
+list_of_pheno_tibbles <- map(valid_results, ~.x$phenotypes)
+all_model_fits <- map(valid_results, ~.x$model_fit)
+names(all_model_fits) <- map(valid_results, ~.x$antigen_name)
+
+# Save all model fits as a single RDS file
+saveRDS(all_model_fits, "mixture_model_fits.rds")
+cat("  -> Saved mixture model fits: mixture_model_fits.rds\n")
 
 # Filter out NULLs from failed fits and prepend the base FID/IID tibble
 # The base tibble ensures all samples are kept, even if some have no phenotype data
 all_valid_tibbles <- c(
     list(select(data_clean, FID, IID)), 
-    compact(list_of_pheno_tibbles) # purrr::compact removes NULLs
+    list_of_pheno_tibbles
 )
 
 # Combine all generated phenotypes into a single master tibble by joining on FID/IID
@@ -240,43 +261,87 @@ for(j in 1:ncol(pca_input_matrix)){
     }
 }
 
-# Run PCA
-pca_results <- prcomp(pca_input_matrix, center = TRUE, scale. = TRUE)
-pc1_assay_noise_df <- pca_results$x %>%
+# Run PCA for seronegative IgG levels
+pca_results_neg <- prcomp(pca_input_matrix, center = TRUE, scale. = TRUE)
+pc1_assay_noise_df <- pca_results_neg$x %>%
   as_tibble() %>%
   select(PC1_assay_noise = PC1) %>%
   bind_cols(select(data_clean, IID), .)
 
-variance_explained <- summary(pca_results)$importance["Proportion of Variance", "PC1"]
-cat("PC1_assay_noise explains", round(variance_explained * 100, 2), "% of variance in seronegative IgG levels.\n")
+variance_explained_neg <- summary(pca_results_neg)$importance["Proportion of Variance", "PC1"]
+cat("PC1_assay_noise explains", round(variance_explained_neg * 100, 2), "% of variance in seronegative IgG levels.\n")
+
+# --- 5b. GENERATE PC1_seropositive COVARIATE (FOR COMPARISON) ---
+cat("\n--- Generating PC1_seropositive Covariate ---\n")
+
+# Start with a matrix of the raw IgG levels for all core antigens
+igg_levels_matrix_pos <- master_pheno_table %>% 
+    select(FID, IID, ends_with("_IgG_raw"))
+
+# For each antigen, set the IgG level to NA for individuals who are NOT confidently seropositive
+# A "confident positive" is defined as p_soft > 0.9
+for (ab_name in core_antigens) {
+    igg_col <- glue("{ab_name}_IgG_raw")
+    soft_col <- glue("{ab_name}_sero_soft")
+
+    if (all(c(igg_col, soft_col) %in% names(master_pheno_table))) {
+        # Get indices of individuals who are NOT confident positives
+        idx_to_mask <- which(master_pheno_table[[soft_col]] <= 0.9)
+        if (length(idx_to_mask) > 0) {
+            igg_levels_matrix_pos[idx_to_mask, igg_col] <- NA
+        }
+    }
+}
+
+# Now, prepare the matrix for PCA: numeric, with IID as rownames
+pca_input_matrix_pos <- igg_levels_matrix_pos %>%
+  select(-any_of(c("FID", "IID"))) %>%
+  # drop antigens that failed and dont exist in the master table
+  select(any_of(glue("{core_antigens}_IgG_raw"))) %>% 
+  as.matrix()
+
+# Impute the remaining NAs (column-wise) using the mean of the confident positives for that antigen
+for(j in 1:ncol(pca_input_matrix_pos)){
+    col_mean <- mean(pca_input_matrix_pos[,j], na.rm = TRUE)
+    if (is.finite(col_mean)) {
+      pca_input_matrix_pos[is.na(pca_input_matrix_pos[,j]), j] <- col_mean
+    } else {
+      # If all values are NA (shouldn't happen), fill with 0
+      pca_input_matrix_pos[,j] <- 0
+    }
+}
+
+# Run PCA for seropositive IgG levels
+pca_results_pos <- prcomp(pca_input_matrix_pos, center = TRUE, scale. = TRUE)
+pc1_seropositive_df <- pca_results_pos$x %>%
+  as_tibble() %>%
+  select(PC1_seropositive = PC1) %>%
+  bind_cols(select(data_clean, IID), .)
+
+variance_explained_pos <- summary(pca_results_pos)$importance["Proportion of Variance", "PC1"]
+cat("PC1_seropositive explains", round(variance_explained_pos * 100, 2), "% of variance in seropositive IgG levels.\n")
 
 
 # --- 6. CREATE QUICKDRAWS INPUT FILES ---
 cat("\n--- Writing Quickdraws Input Files ---\n")
 
-# 6a. Master Covariate File
-# NOTE: This assumes `age_sex.txt` and `covariates.txt` are in the working directory.
-# You may need to adjust paths for your environment.
-covar_base <- fread("age_sex.txt")
-pcs_base <- fread("covariates.txt")
+# 6a. Master Covariate File ---
+cat("Reading covariate files with a post-hoc fix for mixed delimiters...\n")
 
-# Ensure column names are as expected, fread might add a 'V' prefix if headers are unusual
-setnames(covar_base, old = c("V1", "V2", "V3", "V4"), new = c("FID", "IID", "age", "sex"), skip_absent = TRUE)
-setnames(pcs_base, old = paste0("V", 1:22), new = c("FID", "IID", paste0("PC", 1:20)), skip_absent = TRUE)
+# Reading age/sex should be fine
+covar_base <- read_delim("age_sex.txt")
 
+# Read the messy PC file without headers
+pcs_fixed <- fread("covariates_clean.txt", sep = " ")
 
-# Ensure we have the expected column names after cleaning
-if (!all(c("FID", "IID") %in% names(covar_base))) {
-  stop("age_sex.txt must contain FID and IID columns after cleaning.")
-}
-if (!all(c("FID", "IID", paste0("PC", 1:20)) %in% names(pcs_base))) {
-  stop("covariates.txt must contain FID, IID, and PC1-20 columns after cleaning.")
-}
-
-master_covar_table <- merge(covar_base, pcs_base, by = c("FID", "IID")) %>%
+# --- Post-hoc cleanup based on the file structure ---
+# 
+# --- Perform the join ---
+master_covar_table <- merge(covar_base, pcs_fixed, by = c("FID", "IID")) %>%
   merge(pc1_assay_noise_df, by = "IID") %>%
+  merge(pc1_seropositive_df, by = "IID") %>%
   as_tibble() %>%
-  select(FID, IID, age, sex, starts_with("PC"), PC1_assay_noise)
+  select(FID, IID, age, sex, all_of(paste0("PC", 1:20)), PC1_assay_noise, PC1_seropositive)
 
 write_tsv(master_covar_table, "quickdraws_input/covariates_master.tsv")
 cat("  -> Wrote master covariate file: quickdraws_input/covariates_master.tsv\n")
@@ -352,3 +417,72 @@ ggsave("quickdraws_input/pc1_assay_noise_correlation_plot.pdf", p, width = 8, he
 cat("  -> Saved PC1_assay_noise correlation plot.\n")
 
 cat("\n--- Phenotype Generation Complete ---\n") 
+
+
+# --- 8. WITHIN-ANTIGEN PHENOTYPE CORRELATIONS ---
+cat("\n--- Correlating Phenotype Definitions ---\n")
+
+# A helper function to safely calculate raw correlations for one antigen
+calculate_correlations <- function(ab_name, data) {
+  # Define column names
+  igg_col <- glue("{ab_name}_IgG_raw")
+  soft_col <- glue("{ab_name}_sero_soft")
+  hard_col <- glue("{ab_name}_sero_hard")
+  
+  # Ensure all necessary columns exist
+  required_cols <- c(igg_col, soft_col, hard_col)
+  if (!all(required_cols %in% names(data))) {
+    return(NULL)
+  }
+  
+  # Subset to non-missing data for this antigen
+  subset_data <- data %>%
+    select(all_of(required_cols)) %>%
+    na.omit()
+    
+  if (nrow(subset_data) < 2) return(NULL)
+
+  # Calculate standard Pearson correlations
+  cor_igg_soft <- cor(subset_data[[igg_col]], subset_data[[soft_col]])
+  cor_hard_soft <- cor(subset_data[[hard_col]], subset_data[[soft_col]])
+  
+  tibble(
+    antigen = ab_name,
+    cor_igg_vs_soft = cor_igg_soft,
+    cor_hard_vs_soft = cor_hard_soft
+  )
+}
+
+# Apply the function to all core antigens and bind the results
+phenotype_correlations <- map_dfr(core_antigens, calculate_correlations, data = master_pheno_table)
+
+# Save the correlation results
+write_tsv(phenotype_correlations, "quickdraws_input/phenotype_correlations.tsv")
+cat("  -> Wrote phenotype correlation summary: quickdraws_input/phenotype_correlations.tsv\n")
+
+# Optional: Create a visualization of the correlations
+cor_long <- phenotype_correlations %>%
+  pivot_longer(
+    cols = -antigen,
+    names_to = "correlation_type",
+    values_to = "correlation_value"
+  )
+
+p_cor <- ggplot(cor_long, aes(x = correlation_type, y = correlation_value, fill = correlation_type)) +
+  geom_col() +
+  facet_wrap(~antigen, ncol = 4) +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+  labs(
+    title = "Within-Antigen Phenotype Correlations (Raw Data)",
+    subtitle = "Comparing different phenotype definitions for each antigen",
+    x = "Correlation Type",
+    y = "Pearson Correlation"
+  )
+  
+ggsave("quickdraws_input/phenotype_correlation_plot.pdf", p_cor, width = 12, height = 15)
+cat("  -> Saved phenotype correlation plot.\n")
+
+
+cat("\n--- Analysis Script Complete ---\n") 
+
