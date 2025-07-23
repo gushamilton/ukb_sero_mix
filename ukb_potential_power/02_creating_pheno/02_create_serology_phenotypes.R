@@ -368,6 +368,11 @@ if (ncol(pca_input_matrix_pos) < 2) {
 }
 cat("PC1_seropositive explains", round(variance_explained_pos * 100, 2), "% of variance in seropositive IgG levels.\n")
 
+# Combine and save the phenotype-derived PC covariates
+pheno_pcs <- left_join(pc1_assay_noise_df, pc1_seropositive_df, by = "IID")
+write_tsv(pheno_pcs, "quickdraws_input/covariates_pheno_pcs.tsv")
+cat("  -> Wrote phenotype-derived PC covariates to quickdraws_input/covariates_pheno_pcs.tsv\n")
+
 
 # --- 6. CREATE QUICKDRAWS INPUT FILES ---
 cat("\n--- Writing Quickdraws Input Files ---\n")
@@ -381,6 +386,9 @@ covar_base <- read_delim("age_sex.txt")
 # Read the messy PC file without headers
 pcs_fixed <- fread("covariates_clean.txt", sep = " ")
 
+write_tsv(pcs_fixed, "quickdraws_input/covariates_pcs.tsv")
+cat("  -> Wrote PC covariates to quickdraws_input/covariates_pcs.tsv\n")
+
 # --- Post-hoc cleanup based on the file structure ---
 # 
 # --- Perform the join ---
@@ -393,33 +401,15 @@ write_tsv(master_covar_table, "quickdraws_input/covariates_master.tsv")
 cat("  -> Wrote master covariate file (no extra PC1 covars): quickdraws_input/covariates_master.tsv\n")
 
 
-# 6b. Phenotype and Weights Files
-pheno_cols <- master_pheno_table %>% select(-ends_with("_w_hard"), -ends_with("_w_igg"), -ends_with("_p_neg"))
-
-# Split quantitative (IgG + sero_soft + IgG_seropos_only) and binary (sero_hard) phenotypes
-phenos_quant <- pheno_cols %>% select(FID, IID, matches("_IgG_raw$|_IgG_seropos_only$|_sero_soft$"))
-phenos_binary <- pheno_cols %>% select(FID, IID, matches("_sero_hard$"))
-
-write_tsv(phenos_quant, "quickdraws_input/phenotypes_quantitative.tsv")
-write_tsv(phenos_binary, "quickdraws_input/phenotypes_binary.tsv")
-cat("  -> Wrote separate phenotype files: quantitative and binary.\n")
-
-# (Optionally keep the combined file for reference)
-write_tsv(pheno_cols, "quickdraws_input/phenotypes_master.tsv")
-cat("  -> Wrote master phenotype file (all traits): quickdraws_input/phenotypes_master.tsv\n")
-
 # Create a manifest of all analyses to run
 analysis_manifest <- list()
 
 for (ab in core_antigens) {
-    # Create Butler-Laporte style IgG phenotype: IgG levels only in seropositives (NA for seronegatives)
-    igg_seropos_only <- master_pheno_table %>%
-        mutate(!!glue("{ab}_IgG_seropos_only") := if_else(!!sym(glue("{ab}_sero_hard")) == 1, !!sym(glue("{ab}_IgG_raw")), NA_real_))
-    
-    # Update master_pheno_table with the new filtered phenotype
+    # Create Butler-Laporte style IgG phenotype (IgG only in seropositives, NA for seronegatives)
+    # and add it directly to the master table.
     master_pheno_table <- master_pheno_table %>%
-        mutate(!!glue("{ab}_IgG_seropos_only") := igg_seropos_only[[glue("{ab}_IgG_seropos_only")]])
-    
+        mutate(!!glue("{ab}_IgG_seropos_only") := if_else(!!sym(glue("{ab}_sero_hard")) == 1, !!sym(glue("{ab}_IgG_raw")), NA_real_))
+
     # Analysis A: Classic binary serostatus (unweighted)
     analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_sero_hard"), analysis_type = "logistic", weights_file = NA)
     
@@ -448,6 +438,21 @@ for (ab in core_antigens) {
 manifest_df <- bind_rows(analysis_manifest)
 write_tsv(manifest_df, "quickdraws_input/analysis_manifest.tsv")
 cat("  -> Wrote", nrow(manifest_df), "weight files and analysis manifest.\n")
+
+# 6b. Phenotype and Weights Files (NOW after all IgG_seropos_only phenotypes are created)
+pheno_cols <- master_pheno_table %>% select(-ends_with("_w_hard"), -ends_with("_w_igg"), -ends_with("_p_neg"))
+
+# Split quantitative (IgG + sero_soft + IgG_seropos_only) and binary (sero_hard) phenotypes
+phenos_quant <- pheno_cols %>% select(FID, IID, ends_with("_IgG_raw"), ends_with("_sero_soft"), ends_with("_IgG_seropos_only"))
+phenos_binary <- pheno_cols %>% select(FID, IID, ends_with("_sero_hard"))
+
+write_tsv(phenos_quant, "quickdraws_input/phenotypes_quantitative.tsv")
+write_tsv(phenos_binary, "quickdraws_input/phenotypes_binary.tsv")
+cat("  -> Wrote separate phenotype files: quantitative and binary.\n")
+
+# (Optionally keep the combined file for reference)
+write_tsv(pheno_cols, "quickdraws_input/phenotypes_master.tsv")
+cat("  -> Wrote master phenotype file (all traits): quickdraws_input/phenotypes_master.tsv\n")
 
 # --- 6c. Create per-analysis minimal phenotype / covariate files for Step-2 ---
 cat("  -> Generating per-analysis phenotype files for Step-2 runs...\n")

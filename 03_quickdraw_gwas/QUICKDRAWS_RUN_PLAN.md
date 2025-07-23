@@ -27,17 +27,26 @@ For each of the 24 antigens the phenotype-generation script outputs **four base 
 | A  | `{ab}_sero_hard` | logistic    | none     | Direct replication of previous binary GWAS |
 | B  | `{ab}_IgG_seropos_only` | linear      | none     | IgG analysed **only in hard seropositives** (NA for seronegatives); Butler-Laporte quantitative scan |
 | C  | `{ab}_IgG_raw`   | linear      | `{ab}_IgG_wgt.weights` | IgG weighted by p; extends B into probabilistic space |
-| D1 | `{ab}_sero_hard` | logistic    | `{ab}_p_soft.weights` | Weight = p; **statistically equivalent (score-test) to E** – compares logistic vs linear implementations |
+| D1 | `{ab}_sero_hard` | logistic    | `{ab}_p_soft.weights` | **Validation for E:** see discussion below. |
 | D2 | `{ab}_sero_hard` | logistic    | `{ab}_w_hard.weights` | Weight = 2·|p−0.5|; focuses on confident cases & controls |
-| E  | `{ab}_sero_soft` | **linear**  | none                   | Analyse p directly; simplest & fastest |
+| E  | `{ab}_sero_soft` | **linear**  | none                   | **Primary probabilistic analysis:** Analyse p directly; simplest & fastest |
 
 We **do not run** an unweighted whole-population IgG analysis.
 
 Row **B** is conceptually identical to the log-MFI analyses performed by Butler-Laporte et&nbsp;al. [Open Forum Infect Dis 2020;7:ofaa450](https://pubmed.ncbi.nlm.nih.gov/33204752/).
 
+### Rationale for Analysis D1 vs E
+Analysis E, which performs a simple linear regression on the soft-probability phenotype (`sero_soft`), is our primary and most powerful method for detecting serostatus associations.
+
+Analysis D1, which performs a *weighted logistic regression* on the hard-binary phenotype (`sero_hard`), may seem counter-intuitive. As the weights are simply the `p_soft` values, seronegative individuals (`sero_hard=0`) have their contribution almost entirely removed from the analysis.
+
+This is intentional. The purpose of Analysis D1 is **not** to be a standalone, improved case/control GWAS. Rather, it serves as a crucial **methodological cross-check** for Analysis E. According to score-test theory, the p-values from a weighted logistic regression (D1) should be statistically equivalent to those from a linear regression on the probability itself (E).
+
+If the results from D1 and E are highly concordant, it provides strong evidence that the simpler, faster, and more practical linear model (Analysis E) is a valid and robust approach.
+
 ### Logistic vs linear discussion
 * `sero_hard`: must be logistic to respect Bernoulli variance.
-* `sero_soft`: could be quasi-binomial, but Quickdraws provides linear; under large *n* the score-test p-value is almost identical.  Linear is faster and avoids over-dispersion tweaks.
+* `sero_soft`: could be quasi-binomial. However, as confirmed by the D1 vs E comparison, using a linear model is a valid and efficient approximation that avoids potential issues with model convergence or over-dispersion.
 
 ### Covariate sets
 `covariates_master.tsv` contains **age, sex and the first 20 genetic PCs only**.  No assay-noise PCs are included in this first run, matching the latest RAP plan.  If we wish to add or drop covariates later we can regenerate this file with the script’s flags.

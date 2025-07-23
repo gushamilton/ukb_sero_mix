@@ -309,3 +309,5 @@ cat("Files created:\n")
 cat("- ukb_antibody_distributions_final.pdf: Plain histograms with cutoffs\n")
 cat("- serology_diagnostic_plots.pdf: Mixture model fitted histograms\n")
 cat("- Power analysis results printed above\n") 
+
+write_tsv(summary_table, "power_analysis_results.tsv")

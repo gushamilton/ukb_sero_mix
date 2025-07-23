@@ -1,0 +1,15 @@
+dx run app-swiss-army-knife \
+  --folder="QuickdrawsGWAS/" \
+  -iin="Bulk/Imputation/UKB imputation from genotype/ukb22828_c22_b0_v3.bgen" \
+  -iin="Bulk/Imputation/UKB imputation from genotype/ukb22828_c22_b0_v3.bgen.bgi" \
+  -iin="Bulk/Imputation/UKB imputation from genotype/ukb22828_c22_b0_v3.sample" \
+  -iin="QuickdrawsGWAS/included_samples.txt" \
+  -icmd="plink2 \
+           --bgen ukb22828_c22_b0_v3.bgen ref-first \
+           --sample ukb22828_c22_b0_v3.sample \
+           --keep included_samples.txt \
+           --make-bed \
+           --out chr22_imputed_antibody" \
+  --instance-type mem1_ssd1_v2_x8 \
+  --name make_chr22_imputed_subset \
+  -y
