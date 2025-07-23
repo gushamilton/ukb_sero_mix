@@ -5,6 +5,47 @@ This document lays out **exactly** how we will run Quickdraws on the RAP for the
 1. **Step-1 (model fitting) is run **once** across *all* phenotypes.**  This captures the shared null model for every trait.
 2. **Step-2 (test-statistics) is run *separately* for every phenotype/weight combination.**  This is necessary because weights are applied *only* in step-2.
 
+---
+## 0  Phenotype catalogue & planned analyses  
+*(summary extracted from `PHENOTYPE_GENERATION_README.md`)*
+
+For each of the 24 antigens the phenotype-generation script outputs **four base traits** plus two weight columns.  They map to the γ- and β-effects as follows:
+
+| Label                    | Type        | Definition (recap) | Intended GWAS question |
+|--------------------------|-------------|--------------------|------------------------|
+| `{ab}_IgG_raw`           | quantitative| log-MFI for everyone | Does a variant modulate antibody *titre* in the population? *(γ-effect)* |
+| `{ab}_IgG_wgt.weights`   | weight file | weight = `p_soft`   | Focuses IgG analysis on seropositives (down-weights negatives) |
+| `{ab}_sero_hard`         | binary      | 0/1 by official cutoff | Classic case/control replication of Butler-Laporte et al. *(β-effect)* |
+| `{ab}_w_hard.weights`    | weight file | weight = `2·|p_soft−0.5|` | Emphasises confident cases/controls |
+| `{ab}_sero_soft`         | quantitative| posterior `p_soft∈[0,1]` | Soft serostatus, maximises power *(β)* |
+| `{ab}_IgG_pos.weights`   | weight file | weight = `sero_hard` (0/1) | **NEW** — replicates Butler-Laporte IgG analysis restricted to hard-positives |
+
+### Analysis grid we will run
+
+| ID | Phenotype column | Model in QD | Weights? | Rationale |
+|----|------------------|-------------|----------|-----------|
+| A  | `{ab}_sero_hard` | logistic    | none     | Direct replication of previous binary GWAS |
+| B  | `{ab}_IgG_raw`   | linear      | `{ab}_IgG_pos.weights` | IgG analysed **only in hard seropositives** (weight = sero_hard); Butler-Laporte quantitative scan |
+| C  | `{ab}_IgG_raw`   | linear      | `{ab}_IgG_wgt.weights` | IgG weighted by p; extends B into probabilistic space |
+| D1 | `{ab}_sero_hard` | logistic    | `{ab}_p_soft.weights` | Weight = p; **statistically equivalent (score-test) to E** – compares logistic vs linear implementations |
+| D2 | `{ab}_sero_hard` | logistic    | `{ab}_w_hard.weights` | Weight = 2·|p−0.5|; focuses on confident cases & controls |
+| E  | `{ab}_sero_soft` | **linear**  | none                   | Analyse p directly; simplest & fastest |
+
+We **do not run** an unweighted whole-population IgG analysis.
+
+Row **B** is conceptually identical to the log-MFI analyses performed by Butler-Laporte et&nbsp;al. [Open Forum Infect Dis 2020;7:ofaa450](https://pubmed.ncbi.nlm.nih.gov/33204752/).
+
+### Logistic vs linear discussion
+* `sero_hard`: must be logistic to respect Bernoulli variance.
+* `sero_soft`: could be quasi-binomial, but Quickdraws provides linear; under large *n* the score-test p-value is almost identical.  Linear is faster and avoids over-dispersion tweaks.
+
+### Covariate sets
+`covariates_master.tsv` contains **age, sex and the first 20 genetic PCs only**.  No assay-noise PCs are included in this first run, matching the latest RAP plan.  If we wish to add or drop covariates later we can regenerate this file with the script’s flags.
+
+The script now also writes minimal per-analysis phenotype files in `quickdraws_input/step2/`, one `<trait>.phen.tsv` for every row of the manifest, so that each `quickdraws-step-2` invocation can mount only the columns it needs.
+
+---
+
 The file structure produced by `02_create_serology_phenotypes.R` and consumed by Quickdraws looks like this:
 
 ```
