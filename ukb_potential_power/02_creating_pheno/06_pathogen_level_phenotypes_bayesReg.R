@@ -1,18 +1,17 @@
 ################################################################################
-#   UKB SEROLOGY: PATHOGEN-LEVEL PHENOTYPES (BAYESIAN REGRESSION) - SCRIPT 06
+#   UKB SEROLOGY: PATHOGEN-LEVEL PHENOTYPES (BAYESIAN REGRESSION + COMPARISON) - SCRIPT 06
 ################################################################################
-#  ▸ Strategy: use the single-antigen posterior probabilities (p_soft) generated
+#  ▸ Strategy: Use the single-antigen posterior probabilities (p_soft) generated
 #    by script 02 as predictors in a Bayesian logistic regression that
 #    approximates the UK Biobank rule (≥2 antigens positive, or pgp3 for CT).
 #  ▸ This learns data-driven weights for each antigen while remaining robust and
 #    fast – logistic regression is easy for MCMC to sample.
-#  ▸ For development the script subsamples ≤2,000 complete cases per pathogen.
-#    Comment out the slice_sample() line to run on the full dataset.
+#  ▸ Also generates comparison plots and GWAS outputs with confidence-based weights.
 ################################################################################
 
 # --- 1. PACKAGES --------------------------------------------------------------
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(tidyverse, glue, brms, future, here, bayestestR)
+pacman::p_load(tidyverse, glue, brms, future, here, bayestestR, patchwork, scales)
 
 plan(multisession, workers = max(1, availableCores() - 1))
 options(mc.cores = max(1, availableCores() - 1))
@@ -28,7 +27,7 @@ pathogen_map <- list(
   EBV = c("ebv_vca", "ebv_ebna1", "ebv_zebra", "ebv_ead"),
   CMV = c("cmv_pp150", "cmv_pp52", "cmv_pp28"),
   CT  = c("ct_pgp3",  "ct_mompa", "ct_mompd", "ct_tarpf1", "ct_tarpf2"),
-  HP  = c("hp_vaca", "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
+  HP  = c("hp_caga",  "hp_vaca", "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
 )
 
 # UKB rule as noisy target -----------------------------------------------------
@@ -48,9 +47,11 @@ make_label <- function(df, antigens, rule){
   }
 }
 
-# --- 4. Loop over pathogens ---------------------------------------------------
+# --- 4. Bayesian Regression + Comparison --------------------------------------
 results <- list()
 model_summaries <- list()
+all_plots <- list()
+gwas_outputs <- list()
 
 for (pth in names(pathogen_map)) {
   antigens <- pathogen_map[[pth]]
@@ -74,7 +75,7 @@ for (pth in names(pathogen_map)) {
   rhs <- paste(soft_cols, collapse = " + ")
   brm_formula <- bf(as.formula(paste("z ~", rhs)), family = bernoulli(link = "logit"))
 
-  cat("\nFitting Bayesian logistic model for", pth, "on", nrow(df_model), "individuals (full dataset)...\n")
+  cat(glue("\nFitting Bayesian logistic model for {pth} on {nrow(df_model)} individuals (full dataset)...\n"))
 
   fit <- brm(brm_formula, data = df_model,
              chains = 2, iter = 2000, warmup = 500,
@@ -134,10 +135,97 @@ for (pth in names(pathogen_map)) {
     antigen_clean <- str_remove(antigen_name, "_sero_soft")
     cat(glue("  {antigen_clean}: {round(coef_summary[i, 'Estimate'], 3)} ({round(coef_summary[i, 'l-95% CI'], 3)}, {round(coef_summary[i, 'u-95% CI'], 3)})\n"))
   }
+
+  # --- Create comparison plots and GWAS outputs ------------------------------
+  # Create UKB hard labels for comparison
+  df$ukb_hard <- make_label(df, antigens, ukb_rules[[pth]])
+  
+  # Rename Bayesian columns for clarity
+  df <- df %>%
+    mutate(
+      bayes_soft = pi_hat,
+      bayes_hard = as.integer(pi_hat >= 0.5)
+    )
+  
+  # Create scatter plots for each antigen
+  antigen_plots <- list()
+  
+  for (i in seq_along(antigens)) {
+    antigen <- antigens[i]
+    soft_col <- paste0(antigen, "_sero_soft")
+    
+    # Calculate correlation
+    cor_val <- cor(df[[soft_col]], df$bayes_soft, use = "complete.obs")
+    
+    p <- df %>%
+      ggplot(aes(x = !!sym(soft_col), y = bayes_soft)) +
+      geom_point(alpha = 0.6, size = 0.8) +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+      labs(
+        title = glue("{pth}: {antigen} vs Pathogen-Level"),
+        subtitle = glue("r = {round(cor_val, 3)}"),
+        x = glue("{antigen} Soft Probability"),
+        y = "Pathogen-Level Soft Probability"
+      ) +
+      theme_minimal() +
+      theme(plot.title = element_text(size = 10),
+            plot.subtitle = element_text(size = 9))
+    
+    antigen_plots[[antigen]] <- p
+  }
+  
+  # Combine antigen plots
+  if (length(antigen_plots) <= 4) {
+    combined_plot <- wrap_plots(antigen_plots, ncol = 2)
+  } else {
+    combined_plot <- wrap_plots(antigen_plots, ncol = 3)
+  }
+  
+  all_plots[[pth]] <- combined_plot + 
+    plot_annotation(title = glue("{pth}: Individual Antigens vs Pathogen-Level Probabilities"))
+  
+  # Create GWAS outputs
+  gwas_outputs[[pth]] <- df %>%
+    select(FID, IID) %>%
+    mutate(
+      # Butler-Laporte/UKB hard seroprevalence
+      !!glue("{tolower(pth)}_ukb_hard") := df$ukb_hard,
+      
+      # Best Bayesian seroprevalence (hard)
+      !!glue("{tolower(pth)}_bayes_hard") := df$bayes_hard,
+      
+      # Soft probability
+      !!glue("{tolower(pth)}_bayes_soft") := df$bayes_soft,
+      
+      # Weights for GWAS - confidence-based weights
+      # For soft phenotypes: use soft probability as weight
+      !!glue("{tolower(pth)}_w_soft") := df$bayes_soft,
+      
+      # For hard phenotypes: use confidence (distance from 0.5) as weight
+      !!glue("{tolower(pth)}_w_hard") := 2 * abs(df$bayes_soft - 0.5)
+    )
 }
 
-# --- 5. Create summary tables and results ------------------------------------
-cat("\nCreating summary tables...\n")
+# --- 5. Save plots -----------------------------------------------------------
+if (!dir.exists("results")) dir.create("results")
+
+# Save individual pathogen plots
+for (pth in names(all_plots)) {
+  ggsave(
+    glue("results/{tolower(pth)}_antigen_vs_pathogen_scatters.pdf"),
+    all_plots[[pth]],
+    width = 12, height = 8, dpi = 300
+  )
+}
+
+# Combine all plots into one file
+if (length(all_plots) > 0) {
+  all_combined <- wrap_plots(all_plots, ncol = 1) +
+    plot_annotation(title = "All Pathogens: Antigen vs Pathogen-Level Comparisons")
+  
+  ggsave("results/all_pathogens_antigen_comparisons.pdf", all_combined,
+         width = 14, height = 10, dpi = 300)
+}
 
 # --- 6. Combine results and write outputs ------------------------------------
 combined <- reduce(results, full_join, by = c("FID", "IID"))
@@ -175,5 +263,52 @@ seroprev_summary <- map_dfr(names(results), function(pth) {
 
 write_tsv(seroprev_summary, "results/bayesian_regression_seroprevalence_summary.tsv")
 
+# --- 7. Create GWAS comparison outputs ---------------------------------------
+# Combine all GWAS outputs
+gwas_combined <- reduce(gwas_outputs, full_join, by = c("FID", "IID"))
+
+# Write main phenotype file with all measures
+write_tsv(gwas_combined, "quickdraws_input/phenotypes_gwas_comparison.tsv")
+cat("\nSaved GWAS comparison phenotypes: phenotypes_gwas_comparison.tsv\n")
+
+# Write separate files for each pathogen and measure type
+for (pth in names(gwas_outputs)) {
+  low <- tolower(pth)
+  res <- gwas_outputs[[pth]]
+  
+  # UKB hard phenotypes
+  write_tsv(res %>% select(FID, IID, !!glue("{low}_ukb_hard")),
+            glue("quickdraws_input/{low}_ukb_hard.pheno"))
+  
+  # Bayesian hard phenotypes  
+  write_tsv(res %>% select(FID, IID, !!glue("{low}_bayes_hard")),
+            glue("quickdraws_input/{low}_bayes_hard.pheno"))
+  
+  # Bayesian soft phenotypes
+  write_tsv(res %>% select(FID, IID, !!glue("{low}_bayes_soft")),
+            glue("quickdraws_input/{low}_bayes_soft.pheno"))
+}
+
+# Create summary table
+summary_table <- map_dfr(names(gwas_outputs), function(pth) {
+  res <- gwas_outputs[[pth]]
+  low <- tolower(pth)
+  
+  tibble(
+    Pathogen = pth,
+    N_Total = nrow(res),
+    UKB_Hard_Seroprev = mean(res[[glue("{low}_ukb_hard")]], na.rm = TRUE),
+    Bayes_Hard_Seroprev = mean(res[[glue("{low}_bayes_hard")]], na.rm = TRUE),
+    Mean_Soft_Prob = mean(res[[glue("{low}_bayes_soft")]], na.rm = TRUE),
+    Mean_Soft_Weight = mean(res[[glue("{low}_w_soft")]], na.rm = TRUE),
+    Mean_Hard_Weight = mean(res[[glue("{low}_w_hard")]], na.rm = TRUE)
+  )
+})
+
+write_tsv(summary_table, "results/gwas_comparison_summary.tsv")
+
 cat("Seroprevalence summary saved to results/bayesian_regression_seroprevalence_summary.tsv\n")
-cat("Weight files written.\nScript 06 complete.\n") 
+cat("GWAS comparison summary saved to results/gwas_comparison_summary.tsv\n")
+cat("Weight files written.\n")
+cat("Scatter plots saved to results/\n")
+cat("Script 06 complete!\n") 
