@@ -12,7 +12,7 @@
 
 # --- 1. PACKAGES --------------------------------------------------------------
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(tidyverse, glue, brms, future, here, bayestestR, patchwork)
+pacman::p_load(tidyverse, glue, brms, future, here, bayestestR)
 
 plan(multisession, workers = max(1, availableCores() - 1))
 options(mc.cores = max(1, availableCores() - 1))
@@ -51,7 +51,6 @@ make_label <- function(df, antigens, rule){
 # --- 4. Loop over pathogens ---------------------------------------------------
 results <- list()
 model_summaries <- list()
-diagnostic_plots <- list()
 
 for (pth in names(pathogen_map)) {
   antigens <- pathogen_map[[pth]]
@@ -85,20 +84,6 @@ for (pth in names(pathogen_map)) {
 
   # Store model summary
   model_summaries[[pth]] <- summary(fit)
-  
-  # Create diagnostic plots
-  p1 <- pp_check(fit, type = "dens_overlay", ndraws = 100) + 
-    ggtitle(glue("{pth}: Posterior Predictive Check"))
-  
-  # Get coefficient plots - brms plot() returns a list, so we need to handle it properly
-  coef_plots <- plot(fit, variable = "b_", regex = TRUE)
-  if (is.list(coef_plots)) {
-    p2 <- coef_plots[[1]] + ggtitle(glue("{pth}: Coefficient Posteriors"))
-  } else {
-    p2 <- coef_plots + ggtitle(glue("{pth}: Coefficient Posteriors"))
-  }
-  
-  diagnostic_plots[[pth]] <- p1 + p2 + plot_layout(ncol = 2)
 
   # Predict on *all* complete-case rows with credible intervals
   pred_full <- fitted(fit, newdata = df, scale = "response", probs = c(0.025, 0.25, 0.75, 0.975))
@@ -152,52 +137,8 @@ for (pth in names(pathogen_map)) {
   }
 }
 
-# --- 5. Create comprehensive diagnostic plots --------------------------------
-cat("\nCreating diagnostic plots...\n")
-
-# Combined diagnostic plot
-all_diagnostics <- wrap_plots(diagnostic_plots, ncol = 2)
-ggsave("results/bayesian_regression_diagnostics.pdf", all_diagnostics, 
-       width = 12, height = 8, dpi = 300)
-
-# Distribution plots for each pathogen
-dist_plots <- list()
-for (pth in names(results)) {
-  p <- results[[pth]] %>%
-    ggplot(aes(x = !!sym(glue("{tolower(pth)}_sero_soft")))) +
-    geom_histogram(bins = 30, alpha = 0.7, fill = "steelblue") +
-    geom_vline(xintercept = 0.5, color = "red", linetype = "dashed") +
-    labs(title = glue("{pth}: Soft Probability Distribution"),
-         x = "Soft Probability", y = "Count") +
-    theme_minimal()
-  
-  dist_plots[[pth]] <- p
-}
-
-combined_dist <- wrap_plots(dist_plots, ncol = 2)
-ggsave("results/bayesian_regression_distributions.pdf", combined_dist, 
-       width = 12, height = 8, dpi = 300)
-
-# Seroprevalence comparison plot
-seroprev_data <- map_dfr(names(results), function(pth) {
-  tibble(
-    Pathogen = pth,
-    Seroprevalence = sum(results[[pth]][[glue("{tolower(pth)}_sero_hard_50")]]) / nrow(results[[pth]]),
-    Method = "Bayesian Regression"
-  )
-})
-
-seroprev_plot <- seroprev_data %>%
-  ggplot(aes(x = Pathogen, y = Seroprevalence, fill = Method)) +
-  geom_col(alpha = 0.8) +
-  scale_y_continuous(labels = scales::percent) +
-  labs(title = "Seroprevalence Estimates by Pathogen",
-       y = "Seroprevalence", x = "Pathogen") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-ggsave("results/bayesian_regression_seroprevalence.pdf", seroprev_plot, 
-       width = 8, height = 6, dpi = 300)
+# --- 5. Create summary tables and results ------------------------------------
+cat("\nCreating summary tables...\n")
 
 # --- 6. Combine results and write outputs ------------------------------------
 combined <- reduce(results, full_join, by = c("FID", "IID"))
@@ -235,6 +176,5 @@ seroprev_summary <- map_dfr(names(results), function(pth) {
 
 write_tsv(seroprev_summary, "results/bayesian_regression_seroprevalence_summary.tsv")
 
-cat("\nDiagnostic plots saved to results/\n")
 cat("Seroprevalence summary saved to results/bayesian_regression_seroprevalence_summary.tsv\n")
 cat("Weight files written.\nScript 06 complete.\n") 
