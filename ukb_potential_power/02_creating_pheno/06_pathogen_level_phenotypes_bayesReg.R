@@ -133,7 +133,7 @@ for (pth in names(pathogen_map)) {
   for (i in 2:nrow(coef_summary)) {  # Skip intercept
     antigen_name <- rownames(coef_summary)[i]
     antigen_clean <- str_remove(antigen_name, "_sero_soft")
-    cat(glue("  {antigen_clean}: {coef_summary[i, 'Estimate']:.3f} ({coef_summary[i, 'l-95% CI']:.3f}, {coef_summary[i, 'u-95% CI']:.3f})\n"))
+    cat(glue("  {antigen_clean}: {round(coef_summary[i, 'Estimate'], 3)} ({round(coef_summary[i, 'l-95% CI'], 3)}, {round(coef_summary[i, 'u-95% CI'], 3)})\n"))
   }
 }
 
