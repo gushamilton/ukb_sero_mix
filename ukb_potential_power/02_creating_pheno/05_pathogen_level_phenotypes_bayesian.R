@@ -78,8 +78,9 @@ pathogen_pheno_list <- map(names(pathogen_map), function(pathogen_name) {
     col_name <- glue("{antigen}_IgG_raw")
     cat("    -> Fitting Bayesian mixture model for:", antigen, "\n")
     
-    # Define the 2-component mixture model formula
-    model_formula <- bf(!!sym(col_name) ~ 1, family = mixture(gaussian, gaussian))
+    # Define the 2-component mixture model formula robustly
+    fml_str <- glue("{col_name} ~ 1")
+    model_formula <- bf(as.formula(fml_str), family = mixture(gaussian, gaussian))
     
     # Fit the model using brms
     # Using 'silent = 2' to suppress Stan compilation messages
