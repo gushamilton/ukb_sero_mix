@@ -31,6 +31,7 @@ pathogen_map <- list(
 )
 
 # Butler-Laporte et al. 2023 MFI thresholds for exact comparison --------------
+# These thresholds match the official ones from 02_create_serology_phenotypes.R
 butler_laporte_thresholds <- list(
   # EBV antigens
   ebv_vca = 250,      # VCA p18
@@ -72,24 +73,39 @@ make_label <- function(df, antigens, rule){
   if (rule$type == "count") {
     # Standard count rule: positive if ≥n antigens are positive
     cols <- paste0(antigens, "_sero_hard")
-    as.integer(rowSums(df[cols], na.rm = TRUE) >= rule$n)
+    # Only use columns that exist in the data
+    existing_cols <- cols[cols %in% names(df)]
+    as.integer(rowSums(df[existing_cols], na.rm = TRUE) >= rule$n)
   } else if (rule$type == "count_exclude_caga") {
     # HP rule: positive if ≥2 antigens are positive, excluding CagA
     cols <- paste0(antigens, "_sero_hard")
     # Remove CagA from the count
     cols_no_caga <- cols[!grepl("caga", cols)]
-    as.integer(rowSums(df[cols_no_caga], na.rm = TRUE) >= rule$n)
+    # Only use columns that exist in the data
+    existing_cols <- cols_no_caga[cols_no_caga %in% names(df)]
+    as.integer(rowSums(df[existing_cols], na.rm = TRUE) >= rule$n)
   } else if (rule$type == "pgp3_or_complex") {
     # CT rule: positive for pGP3 OR negative for pGP3 but positive for 2 out of 5 remaining antigens
     pgp3_col <- "ct_pgp3_sero_hard"
     other_cols <- paste0(antigens[antigens != "ct_pgp3"], "_sero_hard")
+    
+    # Check if pGP3 column exists
+    if (!(pgp3_col %in% names(df))) {
+      warning("pGP3 column not found. Using only other antigens for CT rule.")
+      # Use only other antigens if pGP3 is missing
+      existing_other_cols <- other_cols[other_cols %in% names(df)]
+      return(as.integer(rowSums(df[existing_other_cols], na.rm = TRUE) >= 2))
+    }
+    
+    # Only use other columns that exist in the data
+    existing_other_cols <- other_cols[other_cols %in% names(df)]
     
     # Positive if pGP3 is positive
     pgp3_positive <- df[[pgp3_col]] == 1
     
     # OR if pGP3 is negative but ≥2 other antigens are positive
     pgp3_negative_but_others <- (df[[pgp3_col]] == 0) & 
-                               (rowSums(df[other_cols], na.rm = TRUE) >= 2)
+                               (rowSums(df[existing_other_cols], na.rm = TRUE) >= 2)
     
     as.integer(pgp3_positive | pgp3_negative_but_others)
   } else {
@@ -103,22 +119,33 @@ make_butler_laporte_hard <- function(df, antigens, pathogen) {
   
   for (i in seq_along(antigens)) {
     antigen <- antigens[i]
-    mfi_col <- paste0(antigen, "_mfi")
+    # Use the correct column name format: _IgG_raw instead of _mfi
+    mfi_col <- paste0(antigen, "_IgG_raw")
     threshold <- butler_laporte_thresholds[[antigen]]
     
     if (is.null(threshold)) {
       stop("Missing threshold for antigen: ", antigen)
     }
     
-    # Skip CagA if the MFI column doesn't exist (missing for many participants)
+    # Skip CagA if the IgG_raw column doesn't exist (missing for many participants)
     if (antigen == "hp_caga" && !(mfi_col %in% names(df))) {
       hard_cols[i] <- paste0(antigen, "_bl_hard")
       df[[hard_cols[i]]] <- NA  # Mark as missing
       next
     }
     
+    # Check if the column exists
+    if (!(mfi_col %in% names(df))) {
+      warning("Column ", mfi_col, " not found in data. Skipping antigen ", antigen)
+      hard_cols[i] <- paste0(antigen, "_bl_hard")
+      df[[hard_cols[i]]] <- NA  # Mark as missing
+      next
+    }
+    
     hard_cols[i] <- paste0(antigen, "_bl_hard")
-    df[[hard_cols[i]]] <- as.integer(df[[mfi_col]] >= threshold)
+    # Convert from log scale back to original scale for threshold comparison
+    # The IgG_raw values are log-transformed, so we need to exponentiate them
+    df[[hard_cols[i]]] <- as.integer(exp(df[[mfi_col]]) >= threshold)
   }
   
   # Apply Butler-Laporte rules
@@ -166,13 +193,34 @@ for (pth in names(pathogen_map)) {
 
   # For HP, exclude CagA from the required columns since it's missing for many participants
   if (pth == "HP") {
-    required_cols <- c(soft_cols[!grepl("caga", soft_cols)], hard_cols[!grepl("caga", hard_cols)])
+    # Filter out CagA from both soft and hard columns
+    soft_cols_filtered <- soft_cols[!grepl("caga", soft_cols)]
+    hard_cols_filtered <- hard_cols[!grepl("caga", hard_cols)]
+    required_cols <- c(soft_cols_filtered, hard_cols_filtered)
+    
+    # Check which columns actually exist in the data
+    existing_cols <- required_cols[required_cols %in% names(master)]
+    missing_cols <- required_cols[!required_cols %in% names(master)]
+    
+    if (length(missing_cols) > 0) {
+      cat("Warning: Missing columns for", pth, ":", paste(missing_cols, collapse = ", "), "\n")
+    }
+    
     df <- master %>%
-      select(FID, IID, all_of(required_cols)) %>%
+      select(FID, IID, all_of(existing_cols)) %>%
       drop_na()
   } else {
+    # Check which columns actually exist in the data
+    all_cols <- c(soft_cols, hard_cols)
+    existing_cols <- all_cols[all_cols %in% names(master)]
+    missing_cols <- all_cols[!all_cols %in% names(master)]
+    
+    if (length(missing_cols) > 0) {
+      cat("Warning: Missing columns for", pth, ":", paste(missing_cols, collapse = ", "), "\n")
+    }
+    
     df <- master %>%
-      select(FID, IID, all_of(c(soft_cols, hard_cols))) %>%
+      select(FID, IID, all_of(existing_cols)) %>%
       drop_na()
   }
   
@@ -190,7 +238,14 @@ for (pth in names(pathogen_map)) {
   df_model <- df
 
   # Build formula -----------------------------------------------------------
-  rhs <- paste(soft_cols, collapse = " + ")
+  # Use only the soft columns that actually exist in the data
+  existing_soft_cols <- soft_cols[soft_cols %in% names(df)]
+  if (length(existing_soft_cols) == 0) {
+    warning("No soft columns found for ", pth, ". Skipping.")
+    next
+  }
+  
+  rhs <- paste(existing_soft_cols, collapse = " + ")
   brm_formula <- bf(as.formula(paste("z ~", rhs)), family = bernoulli(link = "logit"))
 
   cat(glue("\nFitting Bayesian logistic model for {pth} on {nrow(df_model)} individuals (full dataset)...\n"))
@@ -271,6 +326,12 @@ for (pth in names(pathogen_map)) {
   for (i in seq_along(antigens)) {
     antigen <- antigens[i]
     soft_col <- paste0(antigen, "_sero_soft")
+    
+    # Skip if the antigen column doesn't exist
+    if (!(soft_col %in% names(df))) {
+      cat("Skipping plot for", antigen, "- column not found\n")
+      next
+    }
     
     # Calculate correlation
     cor_val <- cor(df[[soft_col]], df$bayes_soft, use = "complete.obs")
