@@ -30,20 +30,40 @@ pathogen_map <- list(
   HP  = c("hp_caga",  "hp_vaca", "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
 )
 
-# UKB rule as noisy target -----------------------------------------------------
+# UKB rule as noisy target (Butler-Laporte et al. 2023) ------------------------
 ukb_rules <- list(
-  EBV = list(type = "count", n = 2),
-  CMV = list(type = "count", n = 2),
-  HP  = list(type = "count", n = 2),
-  CT  = list(type = "pgp3")
+  EBV = list(type = "count", n = 2),  # Positive for 2 or more antigens
+  CMV = list(type = "count", n = 2),  # Positive for 2 or more antigens
+  HP  = list(type = "count_exclude_caga", n = 2),  # Positive for 2 or more antigens, except CagA
+  CT  = list(type = "pgp3_or_complex")  # Positive for pGP3 OR negative for pGP3 but positive for 2 out of 5 remaining antigens
 )
 
 make_label <- function(df, antigens, rule){
   if (rule$type == "count") {
+    # Standard count rule: positive if ≥n antigens are positive
     cols <- paste0(antigens, "_sero_hard")
     as.integer(rowSums(df[cols], na.rm = TRUE) >= rule$n)
-  } else { # pgp3 rule
-    df$ct_pgp3_sero_hard
+  } else if (rule$type == "count_exclude_caga") {
+    # HP rule: positive if ≥2 antigens are positive, excluding CagA
+    cols <- paste0(antigens, "_sero_hard")
+    # Remove CagA from the count
+    cols_no_caga <- cols[!grepl("caga", cols)]
+    as.integer(rowSums(df[cols_no_caga], na.rm = TRUE) >= rule$n)
+  } else if (rule$type == "pgp3_or_complex") {
+    # CT rule: positive for pGP3 OR negative for pGP3 but positive for 2 out of 5 remaining antigens
+    pgp3_col <- "ct_pgp3_sero_hard"
+    other_cols <- paste0(antigens[antigens != "ct_pgp3"], "_sero_hard")
+    
+    # Positive if pGP3 is positive
+    pgp3_positive <- df[[pgp3_col]] == 1
+    
+    # OR if pGP3 is negative but ≥2 other antigens are positive
+    pgp3_negative_but_others <- (df[[pgp3_col]] == 0) & 
+                               (rowSums(df[other_cols], na.rm = TRUE) >= 2)
+    
+    as.integer(pgp3_positive | pgp3_negative_but_others)
+  } else {
+    stop("Unknown rule type: ", rule$type)
   }
 }
 
