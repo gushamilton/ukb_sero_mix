@@ -115,21 +115,13 @@ if (file.exists("serology_export_title.tsv")) {
 
 cat("Data loaded for", ncol(data_clean) - 2, "antigens and", nrow(data_clean), "samples.\n")
 
-# After master_pheno_table is loaded, load covariate tables to get PC components
-pheno_pcs_table <- NULL
-if (file.exists("quickdraws_input/covariates_pheno_pcs.tsv")) {
-  pheno_pcs_table <- read_tsv("quickdraws_input/covariates_pheno_pcs.tsv", show_col_types = FALSE)
-  cat("Loaded phenotype-derived PCs from quickdraws_input/covariates_pheno_pcs.tsv\n")
+# Load the single, combined covariate file
+covar_table <- NULL
+if (file.exists("quickdraws_input/covariates_all.tsv")) {
+  covar_table <- read_tsv("quickdraws_input/covariates_all.tsv", show_col_types = FALSE)
+  cat("Loaded combined covariates from quickdraws_input/covariates_all.tsv\n")
 } else {
-  warning("Phenotype-derived PC file not found. PC plots will be skipped.")
-}
-
-geno_pcs_table <- NULL
-if (file.exists("quickdraws_input/covariates_pcs.tsv")) {
-  geno_pcs_table <- read_tsv("quickdraws_input/covariates_pcs.tsv", show_col_types = FALSE)
-  cat("Loaded genetic PCs from quickdraws_input/covariates_pcs.tsv\n")
-} else {
-  warning("Genetic PC file not found. Some PC plots may be skipped.")
+  warning("Combined covariate file not found. PC and other covariate-based plots will be skipped.")
 }
 
 # --- 3. DIAGNOSTIC PLOTTING FUNCTIONS ---
@@ -605,7 +597,7 @@ for (antigen in core_antigens) {
   p5 <- plot_igg_vs_probability(antigen, master_pheno_table, threshold)
   p6 <- plot_probability_histogram(antigen, master_pheno_table)
   p7 <- plot_classification_comparison(antigen, master_pheno_table, threshold)
-  p8 <- plot_pc1_trends(antigen, master_pheno_table, pheno_pcs_table)
+  p8 <- plot_pc1_trends(antigen, master_pheno_table, covar_table)
 
   combined_plot <- (p1 + p2) / (p3 + p4) / (p5 + p6) / (p7 + p8) +
     plot_layout(guides = "collect") +

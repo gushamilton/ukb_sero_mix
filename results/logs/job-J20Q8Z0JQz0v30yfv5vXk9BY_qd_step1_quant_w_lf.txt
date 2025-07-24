@@ -1,0 +1,391 @@
+[Jul 23 2025, 4:54 PM] Logging initialized (priority)
+[Jul 23 2025, 4:54 PM] Logging initialized (bulk)
+[Jul 23 2025, 4:54 PM] Downloading bundled file resources.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking resources.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file qctool.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking qctool.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file plato.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking plato.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file bedtools.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking bedtools.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file htslib.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking htslib.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file java.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking java.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file plink.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking plink.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file r.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking r.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file sambamba.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking sambamba.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file seqtk.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking seqtk.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:54 PM] Downloading bundled file vcflib.tar.gz
+[Jul 23 2025, 4:54 PM] >>> Unpacking vcflib.tar.gz to /
+[Jul 23 2025, 4:54 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:55 PM] Downloading bundled file vcftools.tar.gz
+[Jul 23 2025, 4:55 PM] >>> Unpacking vcftools.tar.gz to /
+[Jul 23 2025, 4:55 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:55 PM] Downloading bundled file plink2.tar.gz
+[Jul 23 2025, 4:55 PM] >>> Unpacking plink2.tar.gz to /
+[Jul 23 2025, 4:55 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:55 PM] Downloading bundled file regenie.tar.gz
+[Jul 23 2025, 4:55 PM] >>> Unpacking regenie.tar.gz to /
+[Jul 23 2025, 4:55 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:55 PM] Downloading bundled file bolt-lmm_asset.tar.gz
+[Jul 23 2025, 4:55 PM] >>> Unpacking bolt-lmm_asset.tar.gz to /
+[Jul 23 2025, 4:55 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:55 PM] Downloading bundled file bgen.tar.gz
+[Jul 23 2025, 4:55 PM] >>> Unpacking bgen.tar.gz to /
+[Jul 23 2025, 4:55 PM] tar: Removing leading `/' from member names
+[Jul 23 2025, 4:55 PM] Setting SSH public key
+[Jul 23 2025, 4:55 PM] dxpy/0.396.0 (Linux-5.15.0-1087-aws-x86_64-with-glibc2.39) Python/3.12.3
+[Jul 23 2025, 4:55 PM] 00:1e.0 3D controller: NVIDIA Corporation GA102GL [A10G] (rev a1)
+[Jul 23 2025, 4:55 PM] bash running (job ID job-J20Q8Z0JQz0v30yfv5vXk9BY)
+[Jul 23 2025, 4:55 PM] downloading file: file-J20JJk0JQz0yG5VFJvQzV4z7 to filesystem: /home/dnanexus/in/in/0/quickdraws.tar
+[Jul 23 2025, 4:55 PM] downloading file: file-J20BQvjJQ7qK0zgFKv8Y9Zk2 to filesystem: /home/dnanexus/in/in/1/genotype_antibody_only.bed
+[Jul 23 2025, 4:55 PM] downloading file: file-J20BQvjJQ7q1Gv4VqzJ3jP6G to filesystem: /home/dnanexus/in/in/2/genotype_antibody_only.bim
+[Jul 23 2025, 4:55 PM] downloading file: file-J20BQvjJQ7q10KGGZZVYpGbF to filesystem: /home/dnanexus/in/in/3/genotype_antibody_only.fam
+[Jul 23 2025, 4:55 PM] downloading file: file-J20Kg70JQz0jy42YZP0PB7Pp to filesystem: /home/dnanexus/in/in/4/phenotypes_quantitative.tsv
+[Jul 23 2025, 4:55 PM] downloading file: file-J20Q7f8JQz0VGv4VqzJ4v1qb to filesystem: /home/dnanexus/in/in/5/covariates_w_lf.tsv
+[Jul 23 2025, 4:55 PM] downloading file: file-J1zzVgQJ1f9p785010b118zF to filesystem: /home/dnanexus/in/in/6/kinship.txt
+[Jul 23 2025, 4:56 PM] Using dxfuse version v1.4.1
+[Jul 23 2025, 4:56 PM] The log file is located at /root/.dxfuse/dxfuse.log
+[Jul 23 2025, 4:56 PM] starting fs daemon
+[Jul 23 2025, 4:56 PM] wait for ready
+[Jul 23 2025, 4:57 PM] Daemon started successfully
+[Jul 23 2025, 4:57 PM] Downloading files using 8 threads+ [[ '' == '' ]]
+[Jul 23 2025, 4:57 PM] + eval 'docker load -i quickdraws.tar && docker run  --security-opt seccomp=unconfined --gpus all --rm --shm-size=16g -v ./:/mnt/ quickdraws quickdraws-step-1 --out /mnt/step1_w_lf --bed /mnt/genotype_antibody_only --phenoFile /mnt/phenotypes_quantitative.tsv --covarFile /mnt/covariates_w_lf.tsv --kinship /mnt/kinship.txt --rhe_random_vectors 100 && tar -cvf step1_output_quant_w_lf.tar ./step1_w_lf*'
+[Jul 23 2025, 4:57 PM] ++ docker load -i quickdraws.tar
+[Jul 23 2025, 5:00 PM] Loaded image: quickdraws:latest
+[Jul 23 2025, 5:00 PM] ++ docker run --security-opt seccomp=unconfined --gpus all --rm --shm-size=16g -v ./:/mnt/ quickdraws quickdraws-step-1 --out /mnt/step1_w_lf --bed /mnt/genotype_antibody_only --phenoFile /mnt/phenotypes_quantitative.tsv --covarFile /mnt/covariates_w_lf.tsv --kinship /mnt/kinship.txt --rhe_random_vectors 100
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] ==========
+[Jul 23 2025, 5:00 PM] == CUDA ==
+[Jul 23 2025, 5:00 PM] ==========
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] CUDA Version 11.8.0
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+[Jul 23 2025, 5:00 PM] By pulling and using the container, you accept the terms and conditions of this license:
+[Jul 23 2025, 5:00 PM] https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM]   ___          _        _         _                             
+[Jul 23 2025, 5:00 PM]  / _ \  _   _ (_)  ___ | | __  __| | _ __   __ _ __      __ ___ 
+[Jul 23 2025, 5:00 PM] | | | || | | || | / __|| |/ / / _` || '__| / _` |\ \ /\ / // __|
+[Jul 23 2025, 5:00 PM] | |_| || |_| || || (__ |   < | (_| || |   | (_| | \ V  V / \__ \
+[Jul 23 2025, 5:00 PM]  \__\_\ \__,_||_| \___||_|\_\ \__,_||_|    \__,_|  \_/\_/  |___/
+[Jul 23 2025, 5:00 PM]                                                                 
+[Jul 23 2025, 5:00 PM] Developed by Hrushikesh Loya and Pier Palamara.
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] Copyright (C) 2024 Quickdraws Developers
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] Quickdraws is free software: you can redistribute it and/or modify
+[Jul 23 2025, 5:00 PM] it under the terms of the GNU General Public License as published by
+[Jul 23 2025, 5:00 PM] the Free Software Foundation, either version 3 of the License, or
+[Jul 23 2025, 5:00 PM] (at your option) any later version.
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] Quickdraws is distributed in the hope that it will be useful,
+[Jul 23 2025, 5:00 PM] but WITHOUT ANY WARRANTY; without even the implied warranty of
+[Jul 23 2025, 5:00 PM] MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+[Jul 23 2025, 5:00 PM] GNU General Public License for more details.
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] You should have received a copy of the GNU General Public License
+[Jul 23 2025, 5:00 PM] along with Quickdraws. If not, see <http://www.gnu.org/licenses/>.
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] Logs saved in: /mnt/step1_w_lf.log
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] Options in effect: 
+[Jul 23 2025, 5:00 PM]      bed: /mnt/genotype_antibody_only
+[Jul 23 2025, 5:00 PM]      covarFile: /mnt/covariates_w_lf.tsv
+[Jul 23 2025, 5:00 PM]      phenoFile: /mnt/phenotypes_quantitative.tsv
+[Jul 23 2025, 5:00 PM]      keepFile: None
+[Jul 23 2025, 5:00 PM]      out: /mnt/step1_w_lf
+[Jul 23 2025, 5:00 PM]      annot: None
+[Jul 23 2025, 5:00 PM]      kinship: /mnt/kinship.txt
+[Jul 23 2025, 5:00 PM]      ldscores: None
+[Jul 23 2025, 5:00 PM]      modelSnps: None
+[Jul 23 2025, 5:00 PM]      rhemc: /usr/local/lib/python3.10/dist-packages/quickdraws/scripts/GENIE_multi_pheno
+[Jul 23 2025, 5:00 PM]      out_step0: None
+[Jul 23 2025, 5:00 PM]      hdf5: None
+[Jul 23 2025, 5:00 PM]      h2_file: None
+[Jul 23 2025, 5:00 PM]      h2_grid: False
+[Jul 23 2025, 5:00 PM]      num_epochs: 40
+[Jul 23 2025, 5:00 PM]      alpha_search_epochs: 80
+[Jul 23 2025, 5:00 PM]      validate_every: -1
+[Jul 23 2025, 5:00 PM]      lr: [0.0004, 0.0002, 0.0002, 0.0001, 2e-05, 5e-06]
+[Jul 23 2025, 5:00 PM]      alpha: [0.01, 0.02, 0.05, 0.1, 0.2, 0.5]
+[Jul 23 2025, 5:00 PM]      cosine_scheduler: False
+[Jul 23 2025, 5:00 PM]      batch_size: 128
+[Jul 23 2025, 5:00 PM]      forward_passes: 1
+[Jul 23 2025, 5:00 PM]      num_workers: 6
+[Jul 23 2025, 5:00 PM]      train_split: 0.9
+[Jul 23 2025, 5:00 PM]      binary: False
+[Jul 23 2025, 5:00 PM]      lowmem: False
+[Jul 23 2025, 5:00 PM]      rhe_random_vectors: 100
+[Jul 23 2025, 5:00 PM]      rhe_jn: 10
+[Jul 23 2025, 5:00 PM]      phen_thres: 0
+[Jul 23 2025, 5:00 PM]      predBetasFlag: False
+[Jul 23 2025, 5:00 PM]      wandb_mode: disabled
+[Jul 23 2025, 5:00 PM]      wandb_entity_name: None
+[Jul 23 2025, 5:00 PM]      wandb_project_name: blr_genetic_association
+[Jul 23 2025, 5:00 PM]      wandb_job_type: None
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] #### Start Time: 2025-07-23 16:00:44 ####
+[Jul 23 2025, 5:00 PM] 
+[Jul 23 2025, 5:00 PM] #### Step 1a. Preprocessing the phenotypes and converting bed to hdf5 ####
+[Jul 23 2025, 5:00 PM] Loading fam file /mnt/genotype_antibody_only.fam
+[Jul 23 2025, 5:00 PM] Loading and preparing phenotypes...
+[Jul 23 2025, 5:00 PM] 72 phenotype(s) were loaded for 9424 samples
+[Jul 23 2025, 5:00 PM] 0 traits are less than 0% phenotyped and will be excluded
+[Jul 23 2025, 5:00 PM] 1 traits are unary and will be excluded
+[Jul 23 2025, 5:00 PM] Identified 71 continuous traits.
+[Jul 23 2025, 5:00 PM] Loading and preparing covariates...
+[Jul 23 2025, 5:00 PM] Samples with available genotypes, phenotypes, and covariates to keep for analysis:7881
+[Jul 23 2025, 5:00 PM] Saving the remaining phenotypes in /mnt/step1_w_lf.traits
+[Jul 23 2025, 5:00 PM] Saving the covariate effects on phenotypes in /mnt/step1_w_lf.covar_effects
+[Jul 23 2025, 5:00 PM] Loading fam file /mnt/genotype_antibody_only.fam
+[Jul 23 2025, 5:00 PM] Saving the postprocessed phenotypes (to be used by RHE) in /mnt/step1_w_lf.rhe
+[Jul 23 2025, 5:00 PM] Loading bim file /mnt/genotype_antibody_only.bim
+[Jul 23 2025, 5:00 PM] Loading fam file /mnt/genotype_antibody_only.fam
+[Jul 23 2025, 5:00 PM] Estimating variance per allele...
+[Jul 23 2025, 5:00 PM] Loading fam file /mnt/genotype_antibody_only.fam
+[Jul 23 2025, 5:00 PM] Loading bim file /mnt/genotype_antibody_only.bim
+[Jul 23 2025, 5:02 PM] Total number of samples in HDF5 file = 7881
+[Jul 23 2025, 5:02 PM] Saving the genotype to HDF5 file...
+[Jul 23 2025, 5:02 PM] 0
+[Jul 23 2025, 5:03 PM] 512
+[Jul 23 2025, 5:03 PM] 1024
+[Jul 23 2025, 5:04 PM] CPU: 23% (8 cores) * Memory: 3535/31718MB * Storage: 41/423GB * Net: 28↓/0↑MBps
+[Jul 23 2025, 5:04 PM] 1536
+[Jul 23 2025, 5:04 PM] 2048
+[Jul 23 2025, 5:05 PM] 2560
+[Jul 23 2025, 5:05 PM] 3072
+[Jul 23 2025, 5:06 PM] 3584
+[Jul 23 2025, 5:07 PM] 4096
+[Jul 23 2025, 5:07 PM] 4608
+[Jul 23 2025, 5:08 PM] 5120
+[Jul 23 2025, 5:08 PM] 5632
+[Jul 23 2025, 5:09 PM] 6144
+[Jul 23 2025, 5:09 PM] 6656
+[Jul 23 2025, 5:10 PM] 7168
+[Jul 23 2025, 5:10 PM] 7680
+[Jul 23 2025, 5:11 PM] Done saving the genotypes to hdf5 file /mnt/step1_w_lf.hdf5
+[Jul 23 2025, 5:11 PM] #### Step 1a. Done in 643.7992424964905 secs ####
+[Jul 23 2025, 5:11 PM] 
+[Jul 23 2025, 5:11 PM] #### Step 1b. Calculating heritability estimates using RHE ####
+[Jul 23 2025, 5:11 PM] Making annotation for accurate h2 estimation
+[Jul 23 2025, 5:11 PM] Loading fam file /mnt/genotype_antibody_only.fam
+[Jul 23 2025, 5:11 PM] Calculating chip LD score on 1000 random samples
+[Jul 23 2025, 5:11 PM] Loading bim file /mnt/genotype_antibody_only.bim
+[Jul 23 2025, 5:14 PM] CPU: 13% (8 cores) * Memory: 4072/31718MB * Storage: 42/423GB * Net: 0↓/0↑MBps
+[Jul 23 2025, 5:15 PM] Number of SNPs with MAF/LD information = 599509
+[Jul 23 2025, 5:15 PM] Loading bim file /mnt/genotype_antibody_only.bim
+[Jul 23 2025, 5:16 PM] Loading fam file /mnt/genotype_antibody_only.fam
+[Jul 23 2025, 5:16 PM] Loading bim file /mnt/genotype_antibody_only.bim
+[Jul 23 2025, 5:16 PM] Opening annotation file provided, doing MC GWAS
+[Jul 23 2025, 5:16 PM] Invoking RHE as: GENIE_multi_pheno  -g /mnt/genotype_antibody_only -p /mnt/step1_w_lf.rhe -annot /mnt/step1_w_lf.maf2_ld4.annot -c /mnt/step1_w_lf.rhe.covars -k 100 -jn 10 -m G -o /mnt/step1_w_lf.rhe.log
+[Jul 23 2025, 5:20 PM] Variance components estimated as [0.14924449 0.07947607 0.01       0.01997287 0.17008337 0.19167446
+[Jul 23 2025, 5:20 PM]  0.01337763 0.01       0.01       0.09281795 0.04314651 0.27881421
+[Jul 23 2025, 5:20 PM]  0.01569978 0.06706429 0.11156258 0.01       0.06994922 0.06105826
+[Jul 23 2025, 5:20 PM]  0.03020971 0.08549911 0.17116201 0.11477406 0.01       0.01
+[Jul 23 2025, 5:20 PM]  0.13484892 0.01730204 0.00446744 0.0278743  0.12771784 0.18122986
+[Jul 23 2025, 5:20 PM]  0.01       0.01       0.01       0.04698553 0.02922384 0.21648517
+[Jul 23 2025, 5:20 PM]  0.02112631 0.03624255 0.07479974 0.01       0.05202698 0.07254039
+[Jul 23 2025, 5:20 PM]  0.08004408 0.12650501 0.16252737 0.13890044 0.01       0.01506034
+[Jul 23 2025, 5:20 PM]  0.09571869 0.01       0.01       0.00643513 0.14538842 0.01
+[Jul 23 2025, 5:20 PM]  0.13820297 0.25500338 0.02899608 0.18265462 0.0582591  0.01
+[Jul 23 2025, 5:20 PM]  0.01       0.06674859 0.01688609 0.14475743 0.01       0.01
+[Jul 23 2025, 5:20 PM]  0.24508768 0.01651731 0.01       0.01       0.01      ] saved in /mnt/step1_w_lf.h2
+[Jul 23 2025, 5:20 PM] #### Step 1b. Done in 524.3983330726624 secs ####
+[Jul 23 2025, 5:20 PM] 
+[Jul 23 2025, 5:20 PM] #### Step 1c. Running VI using spike and slab prior ####
+[Jul 23 2025, 5:20 PM] Using GPU to run variational inference!!
+[Jul 23 2025, 5:20 PM] 
+[Jul 23 2025, 5:20 PM] Starting search for optimal alpha...
+[Jul 23 2025, 5:20 PM]   0%|          | 0/80 [00:00<?, ?it/s]Epoch: 1/80
+[Jul 23 2025, 5:21 PM]   1%|▏         | 1/80 [00:40<53:02, 40.29s/it]Epoch: 2/80
+[Jul 23 2025, 5:21 PM]   2%|▎         | 2/80 [01:13<47:16, 36.37s/it]Epoch: 3/80
+[Jul 23 2025, 5:22 PM]   4%|▍         | 3/80 [01:47<45:02, 35.10s/it]Epoch: 4/80
+[Jul 23 2025, 5:22 PM]   5%|▌         | 4/80 [02:21<43:48, 34.58s/it]Epoch: 5/80
+[Jul 23 2025, 5:23 PM]   6%|▋         | 5/80 [02:55<42:52, 34.31s/it]Epoch: 6/80
+[Jul 23 2025, 5:23 PM]   8%|▊         | 6/80 [03:28<42:00, 34.06s/it]Epoch: 7/80
+[Jul 23 2025, 5:24 PM] CPU: 18% (8 cores) * Memory: 13112/31718MB * Storage: 42/423GB * Net: 0↓/0↑MBps
+[Jul 23 2025, 5:24 PM]   9%|▉         | 7/80 [04:02<41:22, 34.01s/it]Epoch: 8/80
+[Jul 23 2025, 5:25 PM]  10%|█         | 8/80 [04:36<40:53, 34.08s/it]Epoch: 9/80
+[Jul 23 2025, 5:25 PM]  11%|█▏        | 9/80 [05:11<40:29, 34.22s/it]Epoch: 10/80
+[Jul 23 2025, 5:26 PM]  12%|█▎        | 10/80 [05:44<39:40, 34.01s/it]Epoch: 11/80
+[Jul 23 2025, 5:26 PM]  14%|█▍        | 11/80 [06:18<39:03, 33.96s/it]Epoch: 12/80
+[Jul 23 2025, 5:27 PM]  15%|█▌        | 12/80 [06:52<38:27, 33.94s/it]Epoch: 13/80
+[Jul 23 2025, 5:27 PM]  16%|█▋        | 13/80 [07:26<37:45, 33.82s/it]Epoch: 14/80
+[Jul 23 2025, 5:28 PM]  18%|█▊        | 14/80 [08:00<37:14, 33.85s/it]Epoch: 15/80
+[Jul 23 2025, 5:28 PM]  19%|█▉        | 15/80 [08:33<36:40, 33.86s/it]Epoch: 16/80
+[Jul 23 2025, 5:29 PM]  20%|██        | 16/80 [09:08<36:17, 34.02s/it]Epoch: 17/80
+[Jul 23 2025, 5:30 PM]  21%|██▏       | 17/80 [09:41<35:29, 33.80s/it]Epoch: 18/80
+[Jul 23 2025, 5:30 PM]  22%|██▎       | 18/80 [10:15<34:50, 33.71s/it]Epoch: 19/80
+[Jul 23 2025, 5:31 PM]  24%|██▍       | 19/80 [10:48<34:08, 33.58s/it]Epoch: 20/80
+[Jul 23 2025, 5:31 PM]  25%|██▌       | 20/80 [11:22<33:48, 33.81s/it]Epoch: 21/80
+[Jul 23 2025, 5:32 PM]  26%|██▋       | 21/80 [11:55<33:01, 33.58s/it]Epoch: 22/80
+[Jul 23 2025, 5:32 PM]  28%|██▊       | 22/80 [12:30<32:40, 33.80s/it]Epoch: 23/80
+[Jul 23 2025, 5:33 PM]  29%|██▉       | 23/80 [13:03<32:00, 33.68s/it]Epoch: 24/80
+[Jul 23 2025, 5:34 PM]  30%|███       | 24/80 [13:37<31:25, 33.68s/it]Epoch: 25/80
+[Jul 23 2025, 5:34 PM] CPU: 25% (8 cores) * Memory: 13366/31718MB * Storage: 42/423GB * Net: 0↓/0↑MBps
+[Jul 23 2025, 5:34 PM]  31%|███▏      | 25/80 [14:11<30:59, 33.82s/it]Epoch: 26/80
+[Jul 23 2025, 5:35 PM]  32%|███▎      | 26/80 [14:45<30:24, 33.79s/it]Epoch: 27/80
+[Jul 23 2025, 5:35 PM]  34%|███▍      | 27/80 [15:18<29:44, 33.66s/it]Epoch: 28/80
+[Jul 23 2025, 5:36 PM]  35%|███▌      | 28/80 [15:52<29:12, 33.69s/it]Epoch: 29/80
+[Jul 23 2025, 5:36 PM]  36%|███▋      | 29/80 [16:26<28:43, 33.80s/it]Epoch: 30/80
+[Jul 23 2025, 5:37 PM]  38%|███▊      | 30/80 [17:00<28:09, 33.79s/it]Epoch: 31/80
+[Jul 23 2025, 5:37 PM]  39%|███▉      | 31/80 [17:33<27:28, 33.65s/it]Epoch: 32/80
+[Jul 23 2025, 5:38 PM]  40%|████      | 32/80 [18:06<26:52, 33.59s/it]Epoch: 33/80
+[Jul 23 2025, 5:39 PM]  41%|████▏     | 33/80 [18:41<26:28, 33.79s/it]Epoch: 34/80
+[Jul 23 2025, 5:39 PM]  42%|████▎     | 34/80 [19:14<25:53, 33.76s/it]Epoch: 35/80
+[Jul 23 2025, 5:40 PM]  44%|████▍     | 35/80 [19:48<25:19, 33.76s/it]Epoch: 36/80
+[Jul 23 2025, 5:40 PM]  45%|████▌     | 36/80 [20:21<24:39, 33.62s/it]Epoch: 37/80
+[Jul 23 2025, 5:41 PM]  46%|████▋     | 37/80 [20:55<24:09, 33.72s/it]Epoch: 38/80
+[Jul 23 2025, 5:41 PM]  48%|████▊     | 38/80 [21:29<23:34, 33.68s/it]Epoch: 39/80
+[Jul 23 2025, 5:42 PM]  49%|████▉     | 39/80 [22:03<23:04, 33.76s/it]Epoch: 40/80
+[Jul 23 2025, 5:43 PM]  50%|█████     | 40/80 [22:37<22:31, 33.80s/it]Epoch: 41/80
+[Jul 23 2025, 5:43 PM]  51%|█████▏    | 41/80 [23:11<22:02, 33.90s/it]Epoch: 42/80
+[Jul 23 2025, 5:44 PM] CPU: 25% (8 cores) * Memory: 11179/31718MB * Storage: 42/423GB * Net: 0↓/0↑MBps
+[Jul 23 2025, 5:44 PM]  52%|█████▎    | 42/80 [23:44<21:24, 33.80s/it]Epoch: 43/80
+[Jul 23 2025, 5:44 PM]  54%|█████▍    | 43/80 [24:18<20:52, 33.85s/it]Epoch: 44/80
+[Jul 23 2025, 5:45 PM]  55%|█████▌    | 44/80 [24:52<20:19, 33.87s/it]Epoch: 45/80
+[Jul 23 2025, 5:45 PM]  56%|█████▋    | 45/80 [25:26<19:43, 33.81s/it]Epoch: 46/80
+[Jul 23 2025, 5:46 PM]  57%|█████▊    | 46/80 [26:00<19:08, 33.79s/it]Epoch: 47/80
+[Jul 23 2025, 5:46 PM]  59%|█████▉    | 47/80 [26:34<18:36, 33.83s/it]Epoch: 48/80
+[Jul 23 2025, 5:47 PM]  60%|██████    | 48/80 [27:08<18:03, 33.85s/it]Epoch: 49/80
+[Jul 23 2025, 5:48 PM]  61%|██████▏   | 49/80 [27:42<17:32, 33.94s/it]Epoch: 50/80
+[Jul 23 2025, 5:48 PM]  62%|██████▎   | 50/80 [28:15<16:54, 33.82s/it]Epoch: 51/80
+[Jul 23 2025, 5:49 PM]  64%|██████▍   | 51/80 [28:50<16:27, 34.06s/it]Epoch: 52/80
+[Jul 23 2025, 5:49 PM]  65%|██████▌   | 52/80 [29:24<15:57, 34.19s/it]Epoch: 53/80
+[Jul 23 2025, 5:50 PM]  66%|██████▋   | 53/80 [29:59<15:23, 34.21s/it]Epoch: 54/80
+[Jul 23 2025, 5:50 PM]  68%|██████▊   | 54/80 [30:33<14:49, 34.22s/it]Epoch: 55/80
+[Jul 23 2025, 5:51 PM]  69%|██████▉   | 55/80 [31:07<14:16, 34.26s/it]Epoch: 56/80
+[Jul 23 2025, 5:52 PM]  70%|███████   | 56/80 [31:41<13:41, 34.24s/it]Epoch: 57/80
+[Jul 23 2025, 5:52 PM]  71%|███████▏  | 57/80 [32:15<13:04, 34.11s/it]Epoch: 58/80
+[Jul 23 2025, 5:53 PM]  72%|███████▎  | 58/80 [32:49<12:27, 34.00s/it]Epoch: 59/80
+[Jul 23 2025, 5:53 PM]  74%|███████▍  | 59/80 [33:23<11:52, 33.92s/it]Epoch: 60/80
+[Jul 23 2025, 5:54 PM] CPU: 25% (8 cores) * Memory: 13372/31718MB * Storage: 42/423GB * Net: 0↓/0↑MBps
+[Jul 23 2025, 5:54 PM]  75%|███████▌  | 60/80 [33:56<11:16, 33.81s/it]Epoch: 61/80
+[Jul 23 2025, 5:54 PM]  76%|███████▋  | 61/80 [34:30<10:41, 33.74s/it]Epoch: 62/80
+[Jul 23 2025, 5:55 PM]  78%|███████▊  | 62/80 [35:04<10:08, 33.82s/it]Epoch: 63/80
+[Jul 23 2025, 5:56 PM]  79%|███████▉  | 63/80 [35:38<09:36, 33.91s/it]Epoch: 64/80
+[Jul 23 2025, 5:56 PM]  80%|████████  | 64/80 [36:11<09:01, 33.82s/it]Epoch: 65/80
+[Jul 23 2025, 5:57 PM]  81%|████████▏ | 65/80 [36:45<08:27, 33.82s/it]Epoch: 66/80
+[Jul 23 2025, 5:57 PM]  82%|████████▎ | 66/80 [37:19<07:53, 33.85s/it]Epoch: 67/80
+[Jul 23 2025, 5:58 PM]  84%|████████▍ | 67/80 [37:53<07:20, 33.86s/it]Epoch: 68/80
+[Jul 23 2025, 5:58 PM]  85%|████████▌ | 68/80 [38:27<06:46, 33.85s/it]Epoch: 69/80
+[Jul 23 2025, 5:59 PM]  86%|████████▋ | 69/80 [39:00<06:10, 33.68s/it]Epoch: 70/80
+[Jul 23 2025, 6:00 PM]  88%|████████▊ | 70/80 [39:34<05:37, 33.76s/it]Epoch: 71/80
+[Jul 23 2025, 6:00 PM]  89%|████████▉ | 71/80 [40:09<05:05, 33.94s/it]Epoch: 72/80
+[Jul 23 2025, 6:01 PM]  90%|█████████ | 72/80 [40:43<04:32, 34.03s/it]Epoch: 73/80
+[Jul 23 2025, 6:01 PM]  91%|█████████▏| 73/80 [41:16<03:56, 33.86s/it]Epoch: 74/80
+[Jul 23 2025, 6:02 PM]  92%|█████████▎| 74/80 [41:50<03:22, 33.83s/it]Epoch: 75/80
+[Jul 23 2025, 6:02 PM]  94%|█████████▍| 75/80 [42:24<02:49, 33.80s/it]Epoch: 76/80
+[Jul 23 2025, 6:03 PM]  95%|█████████▌| 76/80 [42:58<02:15, 33.85s/it]Epoch: 77/80
+[Jul 23 2025, 6:03 PM]  96%|█████████▋| 77/80 [43:32<01:41, 33.88s/it]Epoch: 78/80
+[Jul 23 2025, 6:04 PM] CPU: 25% (8 cores) * Memory: 13018/31718MB * Storage: 42/423GB * Net: 0↓/0↑MBps
+[Jul 23 2025, 6:04 PM]  98%|█████████▊| 78/80 [44:05<01:07, 33.86s/it]Epoch: 79/80
+[Jul 23 2025, 6:05 PM]  99%|█████████▉| 79/80 [44:40<00:33, 33.96s/it]Epoch: 80/80
+[Jul 23 2025, 6:05 PM] 100%|██████████| 80/80 [45:13<00:00, 33.87s/it]100%|██████████| 80/80 [45:13<00:00, 33.92s/it]
+[Jul 23 2025, 6:05 PM] Best R2 across all alpha values: [ 0.21293553  0.27678149  0.25423424  0.21207025  0.36217386  0.3213699
+[Jul 23 2025, 6:05 PM]   0.23984482  0.20830463  0.24264975  0.46386897  0.37564047  0.36870918
+[Jul 23 2025, 6:05 PM]   0.24065107  0.32253074  0.24400658  0.31596645  0.30621356  0.2387648
+[Jul 23 2025, 6:05 PM]   0.22004251  0.37351083  0.31124746  0.23857267  0.39050031  0.40084022
+[Jul 23 2025, 6:05 PM]   0.17683172  0.0276352   0.21593391  0.18321225  0.31267047  0.27987397
+[Jul 23 2025, 6:05 PM]   0.15237298  0.15023138  0.1351174   0.32665313  0.20193006  0.24683861
+[Jul 23 2025, 6:05 PM]   0.18057237  0.14070299  0.16151873  0.14959506  0.15139441  0.22377462
+[Jul 23 2025, 6:05 PM]   0.12347818  0.13865734  0.13473185  0.14375444  0.38253672  0.06723132
+[Jul 23 2025, 6:05 PM]   0.08333235  0.1526966   0.16249014  0.04295231  0.23885834  0.10141547
+[Jul 23 2025, 6:05 PM]   0.29744584  0.23676021  0.05164281  0.12330695  0.06775792  0.03190595
+[Jul 23 2025, 6:05 PM]   0.03448186  0.11894084  0.11163971  0.14636191  0.14130075  0.07055747
+[Jul 23 2025, 6:05 PM]   0.20479268  0.13165741  0.04308916  0.12946366 -0.01264704]
+[Jul 23 2025, 6:05 PM] Best MSE across all alpha values: [0.91134198 0.86982546 0.96325238 1.08399956 0.93240529 0.87651179
+[Jul 23 2025, 6:05 PM]  0.91893745 0.93189528 0.88770136 0.72875889 0.85791371 0.83578274
+[Jul 23 2025, 6:05 PM]  0.97367218 0.93467246 0.88985063 0.86660373 0.86767189 0.92996373
+[Jul 23 2025, 6:05 PM]  0.91673931 0.76450589 0.85154645 0.91213989 0.76905919 0.7914334
+[Jul 23 2025, 6:05 PM]  0.95173828 0.9496552  1.10056788 1.04317625 0.99099026 0.95007572
+[Jul 23 2025, 6:05 PM]  0.97566951 0.97540354 0.98403456 0.90298974 0.98214546 0.92773424
+[Jul 23 2025, 6:05 PM]  0.97922614 1.00707418 0.94922771 0.95132955 0.99184307 0.94423724
+[Jul 23 2025, 6:05 PM]  0.98102976 0.88298204 0.8978632  0.93998868 0.80992852 1.09206451
+[Jul 23 2025, 6:05 PM]  1.01337828 1.0629227  0.95405154 1.06157693 0.9274188  0.95980775
+[Jul 23 2025, 6:05 PM]  0.90451086 0.95768682 0.91140092 0.89156473 0.96154381 0.97933088
+[Jul 23 2025, 6:05 PM]  0.96209976 0.96618192 1.03447476 0.97662266 1.00305585 0.9852724
+[Jul 23 2025, 6:05 PM]  0.9584913  1.03119819 1.01398475 1.00643902 0.89887654]
+[Jul 23 2025, 6:05 PM] Best Neff across all alpha values: [0.9976579  0.98604075 1.00509374 1.01355499 1.05305319 1.03757124
+[Jul 23 2025, 6:05 PM]  0.98494578 0.96998518 0.96979601 0.98228835 1.00729701 1.04995848
+[Jul 23 2025, 6:05 PM]  0.98099989 1.02922021 1.03152795 0.97198293 0.99217217 1.00766209
+[Jul 23 2025, 6:05 PM]  0.99072683 0.99418    1.02402193 1.01129645 1.01126223 1.02569248
+[Jul 23 2025, 6:05 PM]  1.00077595 0.99130185 1.0135578  1.01290923 1.04472652 1.03716665
+[Jul 23 2025, 6:05 PM]  0.98093039 0.97859645 0.97444888 0.97296346 0.99846943 1.01152295
+[Jul 23 2025, 6:05 PM]  0.98326555 1.0063997  1.01663263 0.9980132  1.00415138 1.01766412
+[Jul 23 2025, 6:05 PM]  0.99911146 0.99779647 0.99321014 1.00189436 0.99160161 0.99183814
+[Jul 23 2025, 6:05 PM]  0.99375544 0.99008756 1.01091406 0.99106568 1.01726726 0.99925322
+[Jul 23 2025, 6:05 PM]  1.05327001 1.026579   0.99697145 0.99849613 1.001663   0.9954817
+[Jul 23 2025, 6:05 PM]  0.99855817 0.9820209  0.99988242 1.01275031 1.00227015 0.99513352
+[Jul 23 2025, 6:05 PM]  1.00879115 1.00369578 0.9972015  1.00638044 0.99518079]
+[Jul 23 2025, 6:06 PM] Done search for alpha in: 2790.3073554039 secs
+[Jul 23 2025, 6:06 PM] 
+[Jul 23 2025, 6:06 PM] Heritability inferred for traits = [0.14924449 0.07947607 0.01       0.01997287 0.17008337 0.19167446
+[Jul 23 2025, 6:06 PM]  0.01337763 0.01       0.01       0.09281795 0.04314651 0.27881421
+[Jul 23 2025, 6:06 PM]  0.01569978 0.06706429 0.11156258 0.01       0.06994922 0.06105826
+[Jul 23 2025, 6:06 PM]  0.03020971 0.08549911 0.17116201 0.11477406 0.01       0.01
+[Jul 23 2025, 6:06 PM]  0.13484892 0.01730204 0.00446744 0.0278743  0.12771784 0.18122986
+[Jul 23 2025, 6:06 PM]  0.01       0.01       0.01       0.04698553 0.02922384 0.21648517
+[Jul 23 2025, 6:06 PM]  0.02112631 0.03624255 0.07479974 0.01       0.05202698 0.07254039
+[Jul 23 2025, 6:06 PM]  0.08004408 0.12650501 0.16252737 0.13890044 0.01       0.01506034
+[Jul 23 2025, 6:06 PM]  0.09571869 0.01       0.01       0.00643513 0.14538842 0.01
+[Jul 23 2025, 6:06 PM]  0.13820297 0.25500338 0.02899608 0.18265462 0.0582591  0.01
+[Jul 23 2025, 6:06 PM]  0.01       0.06674859 0.01688609 0.14475743 0.01       0.01
+[Jul 23 2025, 6:06 PM]  0.24508768 0.01651731 0.01       0.01       0.01      ]
+[Jul 23 2025, 6:06 PM] 
+[Jul 23 2025, 6:06 PM] Sparsity inferred for traits = [0.05 0.05 0.05 0.05 0.01 0.02 0.05 0.1  0.1  0.05 0.1  0.01 0.5  0.01
+[Jul 23 2025, 6:06 PM]  0.01 0.2  0.1  0.1  0.5  0.01 0.01 0.01 0.5  0.05 0.01 0.05 0.01 0.01
+[Jul 23 2025, 6:06 PM]  0.01 0.01 0.05 0.1  0.1  0.1  0.1  0.05 0.2  0.01 0.01 0.2  0.1  0.1
+[Jul 23 2025, 6:06 PM]  0.5  0.5  0.01 0.01 0.05 0.1  0.5  0.1  0.5  0.05 0.01 0.5  0.01 0.5
+[Jul 23 2025, 6:06 PM]  0.5  0.1  0.5  0.5  0.01 0.1  0.01 0.01 0.1  0.01 0.05 0.1  0.1  0.5
+[Jul 23 2025, 6:06 PM]  0.5 ]
+[Jul 23 2025, 6:06 PM] 
+[Jul 23 2025, 6:06 PM] Training on entire data with best alphas: [0.01 0.02 0.05 0.1  0.2  0.5 ]
+[Jul 23 2025, 6:07 PM] Calculating estimates using entire dataset...
+[Jul 23 2025, 6:07 PM]   0%|          | 0/40 [00:00<?, ?it/s]Epoch: 1/40
+[Jul 23 2025, 6:07 PM]   0%|          | 0/40 [00:05<?, ?it/s]
+[Jul 23 2025, 6:07 PM] Traceback (most recent call last):
+[Jul 23 2025, 6:07 PM]   File "/usr/local/bin/quickdraws-step-1", line 8, in <module>
+[Jul 23 2025, 6:07 PM]     sys.exit(main())
+[Jul 23 2025, 6:07 PM]   File "/usr/local/lib/python3.10/dist-packages/quickdraws/scripts/quickdraws_step1.py", line 376, in main
+[Jul 23 2025, 6:07 PM]     beta = blr_spike_slab(args, VC, hdf5_filename, device)
+[Jul 23 2025, 6:07 PM]   File "/usr/local/lib/python3.10/dist-packages/quickdraws/blr.py", line 1399, in blr_spike_slab
+[Jul 23 2025, 6:07 PM]     _ = trainer.train_epoch_loco(epoch)
+[Jul 23 2025, 6:07 PM]   File "/usr/local/lib/python3.10/dist-packages/quickdraws/blr.py", line 855, in train_epoch_loco
+[Jul 23 2025, 6:07 PM]     preds, reg_loss = model(
+[Jul 23 2025, 6:07 PM]   File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+[Jul 23 2025, 6:07 PM]     return self._call_impl(*args, **kwargs)
+[Jul 23 2025, 6:07 PM]   File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+[Jul 23 2025, 6:07 PM]     return forward_call(*args, **kwargs)
+[Jul 23 2025, 6:07 PM]   File "/usr/local/lib/python3.10/dist-packages/quickdraws/blr.py", line 261, in forward
+[Jul 23 2025, 6:07 PM]     x, reg = self.sc1(x, self.fc1.weight, only_output, test)
+[Jul 23 2025, 6:07 PM]   File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+[Jul 23 2025, 6:07 PM]     return self._call_impl(*args, **kwargs)
+[Jul 23 2025, 6:07 PM]   File "/usr/local/lib/python3.10/dist-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+[Jul 23 2025, 6:07 PM]     return forward_call(*args, **kwargs)
+[Jul 23 2025, 6:07 PM]   File "/usr/local/lib/python3.10/dist-packages/quickdraws/blr.py", line 144, in forward
+[Jul 23 2025, 6:07 PM]     (1 - spike).mul(torch.log((1 - spike) / (1 - self.alpha)))
+[Jul 23 2025, 6:07 PM] torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 30.00 MiB. GPU 0 has a total capacity of 22.20 GiB of which 23.12 MiB is free. Process 18529 has 22.16 GiB memory in use. Of the allocated memory 20.39 GiB is allocated by PyTorch, and 641.71 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[Jul 24 2025, 8:29 AM] END_LOG
