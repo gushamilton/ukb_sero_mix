@@ -193,3 +193,16 @@ The selected antigens provide:
 4. **High Prevalence:** Most antigens have >20% seropositivity ensuring adequate sample sizes
 
 This selection maximizes the potential for discovering novel genetic associations while ensuring robust statistical power through the mixture model approach. 
+
+## Further Antigen Exclusion Based on Heritability Analysis
+
+Following an initial GWAS run (REGENIE step 1), heritability was estimated for all quantitative traits. The results, available in `results/logs/h2_comparison.tsv`, revealed that several antigens and their derived traits exhibited very low heritability, often at the boundary of the estimation (h² ≈ 0.01).
+
+Low heritability indicates a weak genetic contribution to the observed phenotypic variance, which severely limits the statistical power to detect genetic associations. To focus computational resources on traits with a stronger genetic signal, a decision was made to exclude antigens where the heritability of the primary raw MFI trait and/or multiple derived traits was consistently at or below 0.01.
+
+Based on this criterion, the following antigen groups will be excluded from subsequent analyses:
+
+- **KSHV (lana):** All derived traits (`_raw`, `_seropos_only`, `_sero_soft`) showed heritability at the 0.01 floor, indicating no detectable genetic signal.
+- **CT (pgp3):** The `_raw` and `_seropos_only` traits for this antigen also showed minimal heritability.
+
+Additionally, other specific traits such as `cmv_pp52_IgG_raw`, `hp_urea_IgG_raw`, and `ebv_zebra_IgG_raw` will be excluded from the final GWAS, even if the parent antigen is analyzed using other, more heritable trait definitions (e.g., `_sero_soft`). This ensures that only traits with a meaningful genetic component are taken forward for association testing. 

@@ -287,20 +287,20 @@ if (length(constant_cols) > 0) {
 
 # Check if we have enough columns for PCA
 if (ncol(pca_input_matrix) < 2) {
-    cat("  -> Warning: Not enough variable columns for PCA. Creating dummy PC1_assay_noise.\n")
-    pc1_assay_noise_df <- tibble(IID = data_clean$IID, PC1_assay_noise = 0)
+    cat("  -> Warning: Not enough variable columns for PCA. Creating dummy latent_factor_1.\n")
+    pc1_assay_noise_df <- tibble(FID = data_clean$FID, IID = data_clean$IID, latent_factor_1 = 0)
     variance_explained_neg <- 0
 } else {
     # Run PCA for seronegative IgG levels
     pca_results_neg <- prcomp(pca_input_matrix, center = TRUE, scale. = TRUE)
     pc1_assay_noise_df <- pca_results_neg$x %>%
       as_tibble() %>%
-      select(PC1_assay_noise = PC1) %>%
+      select(latent_factor_1 = PC1) %>%
       bind_cols(select(data_clean, FID, IID), .)
     
     variance_explained_neg <- summary(pca_results_neg)$importance["Proportion of Variance", "PC1"]
 }
-cat("PC1_assay_noise explains", round(variance_explained_neg * 100, 2), "% of variance in seronegative IgG levels.\n")
+cat("latent_factor_1 explains", round(variance_explained_neg * 100, 2), "% of variance in seronegative IgG levels.\n")
 
 # --- 5b. GENERATE PC1_seropositive COVARIATE (FOR COMPARISON) ---
 cat("\n--- Generating PC1_seropositive Covariate ---\n")
@@ -353,20 +353,52 @@ if (length(constant_cols_pos) > 0) {
 
 # Check if we have enough columns for PCA
 if (ncol(pca_input_matrix_pos) < 2) {
-    cat("  -> Warning: Not enough variable columns for seropositive PCA. Creating dummy PC1_seropositive.\n")
-    pc1_seropositive_df <- tibble(IID = data_clean$IID, PC1_seropositive = 0)
+    cat("  -> Warning: Not enough variable columns for seropositive PCA. Creating dummy latent_factor_2.\n")
+    pc1_seropositive_df <- tibble(FID = data_clean$FID, IID = data_clean$IID, latent_factor_2 = 0)
     variance_explained_pos <- 0
 } else {
     # Run PCA for seropositive IgG levels
     pca_results_pos <- prcomp(pca_input_matrix_pos, center = TRUE, scale. = TRUE)
     pc1_seropositive_df <- pca_results_pos$x %>%
       as_tibble() %>%
-      select(PC1_seropositive = PC1) %>%
+      select(latent_factor_2 = PC1) %>%
       bind_cols(select(data_clean, FID, IID), .)
     
     variance_explained_pos <- summary(pca_results_pos)$importance["Proportion of Variance", "PC1"]
 }
-cat("PC1_seropositive explains", round(variance_explained_pos * 100, 2), "% of variance in seropositive IgG levels.\n")
+cat("latent_factor_2 explains", round(variance_explained_pos * 100, 2), "% of variance in seropositive IgG levels.\n")
+
+# --- 5c. GENERATE latent_factor_igg (GLOBAL IgG PC1) ---
+cat("\n--- Generating latent_factor_igg (Global IgG PC1) ---\n")
+igg_all_matrix <- master_pheno_table %>%
+  select(ends_with("_IgG_raw")) %>%
+  as.matrix()
+
+# Mean-impute missing values
+for(j in seq_len(ncol(igg_all_matrix))){
+  col_mean <- mean(igg_all_matrix[,j], na.rm = TRUE)
+  if (is.finite(col_mean)) {
+    igg_all_matrix[is.na(igg_all_matrix[,j]), j] <- col_mean
+  } else {
+    igg_all_matrix[,j] <- 0
+  }
+}
+
+if(ncol(igg_all_matrix) < 2){
+  cat("  -> Warning: Not enough variable columns for global IgG PCA. Creating dummy latent_factor_igg.\n")
+  latent_factor_igg_vec <- rep(0, nrow(master_pheno_table))
+} else {
+  pca_results_all <- prcomp(igg_all_matrix, center = TRUE, scale. = TRUE)
+  latent_factor_igg_vec <- pca_results_all$x[,1]
+}
+
+latent_factor_igg_df <- tibble(FID = master_pheno_table$FID, IID = master_pheno_table$IID, latent_factor_igg = latent_factor_igg_vec)
+
+# Merge latent factors into master phenotype table
+master_pheno_table <- master_pheno_table %>%
+  left_join(pc1_assay_noise_df, by = c("FID", "IID")) %>%
+  left_join(pc1_seropositive_df, by = c("FID", "IID")) %>%
+  left_join(latent_factor_igg_df, by = c("FID", "IID"))
 
 # Combine and save the phenotype-derived PC covariates
 pheno_pcs <- left_join(pc1_assay_noise_df, pc1_seropositive_df, by = c("FID", "IID"))
@@ -498,8 +530,15 @@ for (ab in core_antigens) {
     analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = glue("{ab}_sero_soft"), analysis_type = "linear", weights_file = NA)
 }
 
+# Add analyses for latent factors
+latent_traits <- c("latent_factor_1", "latent_factor_2", "latent_factor_igg")
+for (lt in latent_traits) {
+  analysis_manifest[[length(analysis_manifest) + 1]] <- tibble(phenotype_name = lt, analysis_type = "linear", weights_file = NA)
+}
+
 manifest_df <- bind_rows(analysis_manifest) %>%
-    filter(!phenotype_name %in% bad_trait_names)
+  filter(!phenotype_name %in% bad_trait_names) %>%
+  filter(!str_starts(phenotype_name, "kshv_lana"))
 
 write_tsv(manifest_df, "quickdraws_input/analysis_manifest.tsv")
 cat("  -> Wrote", nrow(manifest_df), "analyses to manifest after QC.\n")
@@ -546,7 +585,7 @@ cat("  -> Wrote", nrow(manifest_df), "minimal phenotype files to", step2_dir, "\
 cat("\n--- QC for PC1_assay_noise ---\n")
 cor_matrix <- cor(
     master_pheno_table %>% select(ends_with("_IgG_raw")),
-    pc1_assay_noise_df$PC1_assay_noise,
+    pc1_assay_noise_df$latent_factor_1,
     use = "pairwise.complete.obs"
 )
 
@@ -636,6 +675,40 @@ p_cor <- ggplot(cor_long, aes(x = correlation_type, y = correlation_value, fill 
   
 ggsave("quickdraws_input/phenotype_correlation_plot.pdf", p_cor, width = 12, height = 15)
 cat("  -> Saved phenotype correlation plot.\n")
+
+
+# --- 9. QC & REPORTING on latent factors ---
+cat("\n--- QC for latent_factor_1 ---\n")
+cor_matrix <- cor(
+  master_pheno_table %>% select(ends_with("_IgG_raw")),
+  master_pheno_table$latent_factor_1,
+  use = "pairwise.complete.obs"
+)
+
+cor_df <- as_tibble(cor_matrix, rownames = "Antigen") %>%
+    rename(Correlation = V1) %>%
+    mutate(Antigen = str_remove(Antigen, "_IgG_raw")) %>%
+    arrange(desc(abs(Correlation)))
+
+cat("Top 5 correlations with latent_factor_1:\n")
+print(head(cor_df, 5))
+
+p <- ggplot(cor_df, aes(x = Correlation, y = reorder(Antigen, Correlation))) +
+    geom_col(fill = "steelblue") +
+    labs(
+        title = "Correlation of latent_factor_1 with Raw log-MFI of Each Antigen",
+        subtitle = "Latent factor from IgG levels of seronegatives, representing shared assay noise",
+        x = "Pearson Correlation", y = "Antigen"
+    ) +
+    theme_light()
+
+ggsave("quickdraws_input/latent_factor_1_correlation_plot.pdf", p, width = 8, height = 10)
+cat("  -> Saved latent_factor_1 correlation plot.\n")
+
+latent_cor <- cor(master_pheno_table %>% select(latent_factor_1, latent_factor_2, latent_factor_igg), use = "pairwise.complete.obs")
+
+write_tsv(as_tibble(latent_cor, rownames = "Latent_Factor"), "quickdraws_input/latent_factor_correlations.tsv")
+cat("  -> Saved latent factor correlations: quickdraws_input/latent_factor_correlations.tsv\n")
 
 
 cat("\n--- Analysis Script Complete ---\n") 
