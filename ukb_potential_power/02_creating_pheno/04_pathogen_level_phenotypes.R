@@ -16,7 +16,7 @@
 
 # --- 1. SETUP & PACKAGES -------------------------------------------------------
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(tidyverse, glue, data.table, here, binom)
+pacman::p_load(tidyverse, glue, data.table, here, binom, cowplot)
 
 # Ensure output directory exists ------------------------------------------------
 if (!dir.exists("quickdraws_input")) dir.create("quickdraws_input")
@@ -35,19 +35,18 @@ cat("Loaded", nrow(master_pheno), "participants.\n")
 pathogen_map <- list(
   EBV   = c("ebv_vca",  "ebv_ebna1", "ebv_zebra", "ebv_ead"),
   CMV   = c("cmv_pp150", "cmv_pp52",  "cmv_pp28"),
-  HHV6  = c("hhv6_ie1a", "hhv6_ie1b", "hhv6_p101k"),
   CT    = c("ct_pgp3",  "ct_mompa",  "ct_mompd", "ct_tarpf1", "ct_tarpf2"),
   HP    = c("hp_caga",  "hp_vaca",  "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
 )
 
 # --- 4. COMBINATION LOGIC -------------------------------------------------------
 
-#' Combine per-antigen probabilities using a Noisy-OR model.
-#' P(Pathogen+) = 1 - P(all antigens negative) = 1 - product(1 - P(antigen_i positive))
+#' Combine per-antigen probabilities using the mean.
+#' This is a more conservative approach than Noisy-OR.
 #' @param p_vector A numeric vector of per-antigen probabilities for one person.
-#' @return A single combined probability.
-noisy_or <- function(p_vector) {
-  1 - prod(1 - p_vector, na.rm = TRUE)
+#' @return A single combined probability (the mean).
+combine_probs <- function(p_vector) {
+  mean(p_vector, na.rm = TRUE)
 }
 
 # --- 5. MAIN LOOP --------------------------------------------------------------
@@ -70,8 +69,8 @@ pheno_tibbles <- map(names(pathogen_map), function(pathogen_name) {
   # Extract the matrix of per-antigen probabilities
   prob_matrix <- as.matrix(master_pheno[cols_to_use])
   
-  # Apply the noisy-OR function row-wise
-  p_soft_combined <- apply(prob_matrix, 1, noisy_or)
+  # Apply the combination function row-wise
+  p_soft_combined <- apply(prob_matrix, 1, combine_probs)
   
   # Create the new phenotype tibble
   tibble(
@@ -149,5 +148,31 @@ print(seroprev_tbl)
 
 write_tsv(seroprev_tbl, "quickdraws_input/pathogen_seroprevalence.tsv")
 cat("  -> Wrote seroprevalence summary to quickdraws_input/pathogen_seroprevalence.tsv\n")
+
+# --- 8. PLOT DISTRIBUTIONS ----------------------------------------------------
+cat("\n--- Generating distribution plots ---\n")
+
+plot_list <- map(successful_pathogens, function(p_name_lower) {
+  soft_col <- glue("{p_name_lower}_sero_soft")
+  
+  ggplot(pathogen_pheno_tbl, aes(x = .data[[soft_col]])) +
+    geom_histogram(bins = 50, fill = "steelblue", alpha = 0.8) +
+    labs(
+      title = glue("Distribution of Combined Probability for {toupper(p_name_lower)}"),
+      x = "Combined 'sero_soft' Probability",
+      y = "Count"
+    ) +
+    theme_light()
+})
+
+# Arrange plots into a grid and save
+n_pathogens <- length(plot_list)
+n_cols <- if (n_pathogens <= 4) 2 else 3
+plot_grid <- cowplot::plot_grid(plotlist = plot_list, ncol = n_cols)
+
+ggsave("quickdraws_input/pathogen_probability_distributions.pdf", plot_grid, 
+       width = n_cols * 5, height = ceiling(n_pathogens / n_cols) * 4)
+cat("  -> Wrote distribution plots to quickdraws_input/pathogen_probability_distributions.pdf\n")
+
 
 cat("\n--- Script 04 complete ---\n") 
