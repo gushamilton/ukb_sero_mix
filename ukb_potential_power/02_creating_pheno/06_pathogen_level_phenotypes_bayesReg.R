@@ -87,11 +87,16 @@ for (pth in names(pathogen_map)) {
   model_summaries[[pth]] <- summary(fit)
   
   # Create diagnostic plots
-  p1 <- pp_check(fit, type = "dens_overlay", nsamples = 100) + 
+  p1 <- pp_check(fit, type = "dens_overlay", ndraws = 100) + 
     ggtitle(glue("{pth}: Posterior Predictive Check"))
   
-  p2 <- plot(fit, variable = "b_", regex = TRUE) + 
-    ggtitle(glue("{pth}: Coefficient Posteriors"))
+  # Get coefficient plots - brms plot() returns a list, so we need to handle it properly
+  coef_plots <- plot(fit, variable = "b_", regex = TRUE)
+  if (is.list(coef_plots)) {
+    p2 <- coef_plots[[1]] + ggtitle(glue("{pth}: Coefficient Posteriors"))
+  } else {
+    p2 <- coef_plots + ggtitle(glue("{pth}: Coefficient Posteriors"))
+  }
   
   diagnostic_plots[[pth]] <- p1 + p2 + plot_layout(ncol = 2)
 
