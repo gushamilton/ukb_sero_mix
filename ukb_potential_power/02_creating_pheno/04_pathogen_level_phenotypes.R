@@ -16,7 +16,7 @@
 
 # --- 1. SETUP & PACKAGES -------------------------------------------------------
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(tidyverse, glue, data.table, here, binom, cowplot)
+pacman::p_load(tidyverse, glue, data.table, here, binom, cowplot, gridExtra)
 
 # Ensure output directory exists ------------------------------------------------
 if (!dir.exists("quickdraws_input")) dir.create("quickdraws_input")
@@ -149,7 +149,136 @@ print(seroprev_tbl)
 write_tsv(seroprev_tbl, "quickdraws_input/pathogen_seroprevalence.tsv")
 cat("  -> Wrote seroprevalence summary to quickdraws_input/pathogen_seroprevalence.tsv\n")
 
-# --- 8. PLOT DISTRIBUTIONS ----------------------------------------------------
+# --- 8. DIAGNOSTICS: CORRELATIONS AND PLOTS -----------------------------------
+cat("\n--- Generating diagnostic correlations and plots ---\n")
+
+# To apply UKB rules, we need the original single-antigen hard calls
+master_antigen_hard_calls <- master_pheno %>%
+  select(FID, IID, any_of(glue("{pathogen_map %>% unlist %>% unique}_sero_hard")))
+
+# Join back to get all necessary columns in one table
+diag_tbl <- left_join(pathogen_pheno_tbl, master_antigen_hard_calls, by = c("FID", "IID"))
+
+
+# --- 8a. UKB Rule-Based Serostatus Definition ---
+ukb_rules <- list(
+  EBV = list(type = "count", n = 2),
+  CMV = list(type = "count", n = 2),
+  HP  = list(type = "count", n = 2),
+  CT  = list(type = "pgp3_positive", antigen = "ct_pgp3_sero_hard")
+)
+
+for (pathogen_name in names(pathogen_map)) {
+    if (pathogen_name %in% names(ukb_rules)) {
+        rule <- ukb_rules[[pathogen_name]]
+        p_lower <- tolower(pathogen_name)
+        ukb_col_name <- glue("{p_lower}_sero_ukb_rule")
+        
+        if (rule$type == "count") {
+            antigens <- pathogen_map[[pathogen_name]]
+            hard_cols <- glue("{antigens}_sero_hard")
+            cols_to_use <- intersect(hard_cols, names(diag_tbl))
+            if(length(cols_to_use) > 0) {
+                antigen_sum <- rowSums(diag_tbl[cols_to_use], na.rm = TRUE)
+                diag_tbl[[ukb_col_name]] <- ifelse(antigen_sum >= rule$n, 1, 0)
+            }
+        } else if (rule$type == "pgp3_positive") {
+            if (rule$antigen %in% names(diag_tbl)) {
+                diag_tbl[[ukb_col_name]] <- diag_tbl[[rule$antigen]]
+            }
+        }
+    }
+}
+
+
+# --- 8b. Correlation Matrices ---
+cat("\nCorrelations between combined probability and constituent antigen probabilities:\n")
+for (pathogen_name in successful_pathogens) {
+    p_upper <- toupper(pathogen_name)
+    
+    combined_col <- glue("{pathogen_name}_sero_soft")
+    antigen_cols <- glue("{pathogen_map[[p_upper]]}_sero_soft")
+    
+    # Need to join to get single-antigen soft probs
+    cols_to_cor_data <- master_pheno %>%
+        select(any_of(c("FID", "IID", antigen_cols))) %>%
+        left_join(pathogen_pheno_tbl %>% select(FID, IID, !!sym(combined_col)), by = c("FID", "IID"))
+
+    cols_to_cor <- intersect(c(combined_col, antigen_cols), names(cols_to_cor_data))
+    
+    if (length(cols_to_cor) > 1) {
+        cat("\n---", p_upper, "---\n")
+        cor_matrix <- cor(cols_to_cor_data[cols_to_cor], use = "pairwise.complete.obs")
+        print(round(cor_matrix, 3))
+    }
+}
+
+
+# --- 8c. Scatter Plots (Combined vs. Individual) ---
+cat("\nGenerating scatter plots (Combined vs. Individual Antigens)...\n")
+scatter_plot_list <- map(successful_pathogens, function(p_name_lower) {
+    p_upper <- toupper(p_name_lower)
+    combined_col <- glue("{p_name_lower}_sero_soft")
+    antigen_cols <- glue("{pathogen_map[[p_upper]]}_sero_soft")
+    
+    cols_to_plot <- intersect(antigen_cols, names(master_pheno))
+    
+    plot_data <- master_pheno %>%
+        select(FID, IID, all_of(cols_to_plot)) %>%
+        left_join(diag_tbl %>% select(FID, IID, !!sym(combined_col)), by = c("FID", "IID"))
+
+    if (length(cols_to_plot) > 0) {
+        plot_data %>%
+            pivot_longer(cols = all_of(cols_to_plot), names_to = "antigen", values_to = "antigen_prob") %>%
+            ggplot(aes(x = antigen_prob, y = .data[[combined_col]])) +
+            geom_point(alpha = 0.05, color = "darkblue", shape = 16) +
+            facet_wrap(~antigen, ncol = 3) +
+            labs(title = glue("Combined vs. Individual Antigen Probabilities for {p_upper}"),
+                 x = "Individual Antigen 'sero_soft' Probability",
+                 y = "Combined (Mean) 'sero_soft' Probability") +
+            theme_bw(base_size = 14)
+    } else { NULL }
+})
+
+ggsave("quickdraws_input/pathogen_vs_antigen_scatters.pdf", 
+       marrangeGrob(grobs = compact(scatter_plot_list), nrow=1, ncol=1), 
+       width = 12, height = 8)
+cat("  -> Saved scatter plots to quickdraws_input/pathogen_vs_antigen_scatters.pdf\n")
+
+
+# --- 8d. Violin Plots (Soft vs. Hard Calls) ---
+cat("\nGenerating violin plots (Soft vs. Hard Calls)...\n")
+comparison_plot_list <- map(successful_pathogens, function(p_name_lower) {
+    p_upper <- toupper(p_name_lower)
+    soft_col <- glue("{p_name_lower}_sero_soft")
+    hard_col <- glue("{p_name_lower}_sero_hard")
+    ukb_col  <- glue("{p_name_lower}_sero_ukb_rule")
+
+    if(!ukb_col %in% names(diag_tbl)) return(NULL)
+
+    plot_data <- diag_tbl %>%
+      select(all_of(c(soft_col, hard_col, ukb_col))) %>%
+      rename(Soft = 1, `Mean Prob >= 0.5` = 2, `UKB Rule` = 3) %>%
+      pivot_longer(-Soft, names_to = "method", values_to = "status")
+
+    ggplot(plot_data, aes(x = as.factor(status), y = Soft, fill = method)) +
+        geom_violin(trim = FALSE, alpha = 0.7) +
+        geom_boxplot(width=0.1, fill="white", alpha=0.7) +
+        facet_wrap(~method, scales = "free_x") +
+        labs(title = glue("Soft Probability Distribution by Hard Call Method for {p_upper}"),
+             x = "Hard Serostatus (0 or 1)",
+             y = "Combined 'sero_soft' Probability") +
+        theme_light(base_size = 14) +
+        theme(legend.position = "none", strip.text = element_text(face="bold"))
+})
+
+ggsave("quickdraws_input/pathogen_soft_vs_hard_comparison.pdf", 
+       marrangeGrob(grobs = compact(comparison_plot_list), nrow=1, ncol=1), 
+       width = 10, height = 6)
+cat("  -> Saved comparison plots to quickdraws_input/pathogen_soft_vs_hard_comparison.pdf\n")
+
+
+# --- 9. PLOT DISTRIBUTIONS ----------------------------------------------------
 cat("\n--- Generating distribution plots ---\n")
 
 plot_list <- map(successful_pathogens, function(p_name_lower) {
