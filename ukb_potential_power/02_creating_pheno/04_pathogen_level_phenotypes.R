@@ -42,7 +42,7 @@ pathogen_map <- list(
   HHV6  = c("hhv6_ie1a", "hhv6_ie1b", "hhv6_p101k"),
   # HBV and HCV removed (too rare for reliable mixture fitting)
   # HPV16 removed (not available in phenotype data)
-  CT    = c("ct_pgp3",  "ct_mompa",  "ct_mompd", "ct_tarpf1", "ct_tarpf2", "ct_porb"),
+  CT    = c("ct_pgp3",  "ct_mompa",  "ct_mompd", "ct_tarpf1", "ct_tarpf2"),
   HP    = c("hp_caga",  "hp_vaca",  "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
 )
 

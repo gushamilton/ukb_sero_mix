@@ -65,7 +65,7 @@ This preserves the information already extracted while allowing the multivariate
 | HBV      | `hbv_hbc`, `hbv_hbe` |
 | HCV      | `hcv_core`, `hcv_ns3` |
 | HPV-16   | `hpv16_l1`, `hpv16_e6`, `hpv16_e7` |
-| C. trachomatis | `ct_pgp3`, `ct_mompa`, `ct_mompd`, `ct_tarpf1`, `ct_tarpf2`, `ct_porb` |
+| C. trachomatis | `ct_pgp3`, `ct_mompa`, `ct_mompd`, `ct_tarpf1`, `ct_tarpf2` |
 | H. pylori | `hp_caga`, `hp_vaca`, `hp_omp`, `hp_groel`, `hp_catalase`, `hp_urea` |
 
 The script will silently skip antigens missing from the phenotype table (e.g. if mixture fitting failed upstream).

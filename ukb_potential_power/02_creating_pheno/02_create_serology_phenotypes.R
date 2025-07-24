@@ -25,11 +25,11 @@ core_antigens <- c(
     "cmv_pp150", "cmv_pp28", "cmv_pp52",
     "hsv1", "hsv2",
     "ebv_vca", "ebv_ebna1", "ebv_zebra", "ebv_ead",
-    "hp_omp", "hp_urea", "hp_caga", "hp_vaca",
+    "hp_omp", "hp_urea", "hp_caga", "hp_vaca", "hp_groel", "hp_catalase",
     "toxo_p22",
     "bkv_vp1", "jcv_vp1", "mcv_vp1",
     "hhv6_ie1a", "hhv6_ie1b", "hhv7_u14",
-    "ct_pgp3", "ct_mompd", "ct_tarpf2",
+    "ct_pgp3", "ct_mompd", "ct_tarpf2", "ct_mompa", "ct_tarpf1",
     "kshv_lana"
 )
 cat("Defined", length(core_antigens), "core antigens for analysis.\n")
@@ -84,7 +84,7 @@ antigen_map <- tribble(
   "hpv16_e7", "E7 antigen for Human Papillomavirus type-16 | Instance 0", 150,
   "hpv18_l1", "L1 antigen for Human Papillomavirus type-18 | Instance 0", 175
 ) %>%
-filter(short_name %in% core_antigens)
+filter(short_name %in% unique(core_antigens))
 
 
 # --- 2. LOAD & PREPARE DATA ---
