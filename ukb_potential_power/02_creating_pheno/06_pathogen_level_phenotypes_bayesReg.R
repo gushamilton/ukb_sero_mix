@@ -110,6 +110,13 @@ make_butler_laporte_hard <- function(df, antigens, pathogen) {
       stop("Missing threshold for antigen: ", antigen)
     }
     
+    # Skip CagA if the MFI column doesn't exist (missing for many participants)
+    if (antigen == "hp_caga" && !(mfi_col %in% names(df))) {
+      hard_cols[i] <- paste0(antigen, "_bl_hard")
+      df[[hard_cols[i]]] <- NA  # Mark as missing
+      next
+    }
+    
     hard_cols[i] <- paste0(antigen, "_bl_hard")
     df[[hard_cols[i]]] <- as.integer(df[[mfi_col]] >= threshold)
   }
@@ -126,6 +133,8 @@ make_butler_laporte_hard <- function(df, antigens, pathogen) {
   } else if (pathogen == "HP") {
     # Positive for 2 or more antigens, except CagA
     cols_no_caga <- hard_cols[!grepl("caga", hard_cols)]
+    # Remove any NA columns (missing CagA)
+    cols_no_caga <- cols_no_caga[!is.na(cols_no_caga)]
     df[[paste0(tolower(pathogen), "_bl_hard")]] <- 
       as.integer(rowSums(df[cols_no_caga], na.rm = TRUE) >= 2)
   } else if (pathogen == "CT") {
@@ -155,9 +164,18 @@ for (pth in names(pathogen_map)) {
   soft_cols <- paste0(antigens, "_sero_soft")
   hard_cols <- paste0(antigens, "_sero_hard")
 
-  df <- master %>%
-    select(FID, IID, all_of(c(soft_cols, hard_cols))) %>%
-    drop_na()
+  # For HP, exclude CagA from the required columns since it's missing for many participants
+  if (pth == "HP") {
+    required_cols <- c(soft_cols[!grepl("caga", soft_cols)], hard_cols[!grepl("caga", hard_cols)])
+    df <- master %>%
+      select(FID, IID, all_of(required_cols)) %>%
+      drop_na()
+  } else {
+    df <- master %>%
+      select(FID, IID, all_of(c(soft_cols, hard_cols))) %>%
+      drop_na()
+  }
+  
   if (nrow(df) < 100) {
     warning("Skipping ", pth, ": less than 100 complete cases")
     next
