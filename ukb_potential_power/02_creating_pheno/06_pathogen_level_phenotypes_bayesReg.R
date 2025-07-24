@@ -28,7 +28,7 @@ pathogen_map <- list(
   EBV = c("ebv_vca", "ebv_ebna1", "ebv_zebra", "ebv_ead"),
   CMV = c("cmv_pp150", "cmv_pp52", "cmv_pp28"),
   CT  = c("ct_pgp3",  "ct_mompa", "ct_mompd", "ct_tarpf1", "ct_tarpf2"),
-  HP  = c("hp_caga",  "hp_vaca", "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
+  HP  = c("hp_vaca", "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
 )
 
 # UKB rule as noisy target -----------------------------------------------------
@@ -67,15 +67,14 @@ for (pth in names(pathogen_map)) {
 
   df$z <- make_label(df, antigens, ukb_rules[[pth]])
 
-  # Subsample for development speed -----------------------------------------
-  set.seed(42)
-  if (nrow(df) > 2000) df_model <- slice_sample(df, n = 200) else df_model <- df
+  # Use full dataset (no subsampling) -----------------------------------------
+  df_model <- df
 
   # Build formula -----------------------------------------------------------
   rhs <- paste(soft_cols, collapse = " + ")
   brm_formula <- bf(as.formula(paste("z ~", rhs)), family = bernoulli(link = "logit"))
 
-  cat("\nFitting Bayesian logistic model for", pth, "on", nrow(df_model), "individuals...\n")
+  cat("\nFitting Bayesian logistic model for", pth, "on", nrow(df_model), "individuals (full dataset)...\n")
 
   fit <- brm(brm_formula, data = df_model,
              chains = 2, iter = 2000, warmup = 500,
