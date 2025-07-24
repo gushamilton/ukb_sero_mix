@@ -1,26 +1,22 @@
 ################################################################################
-#   UKB SEROLOGY: PATHOGEN-LEVEL SOFT PHENOTYPES (SCRIPT 04)
+#   UKB SEROLOGY: PATHOGEN-LEVEL SOFT PHENOTYPES (SCRIPT 04) - NOISY-OR
 ################################################################################
-#  ∙ Combines multiple antigen measurements for each pathogen into a single
-#    posterior infection probability using a 2-component multivariate Gaussian
-#    mixture (full covariance) fitted with mclust.
-#  ∙ Per-antigen mixture probabilities from Script 02 are used to initialise
-#    the EM algorithm, preserving previous information and accelerating
-#    convergence.
+#  ∙ Combines multiple per-antigen soft probabilities (from Script 02) into a
+#    single pathogen-level probability using a "Noisy-OR" model.
+#  ∙ This approach avoids fitting a new multivariate mixture model, making it
+#    more robust and sidestepping potential convergence issues with mclust.
+#  ∙ It assumes conditional independence of antigens given the true latent status.
 #  ∙ Outputs (per pathogen):
-#      ‑ <pathogen>_sero_soft   – posterior P(infected)
+#      ‑ <pathogen>_sero_soft   – Combined P(infected)
 #      ‑ <pathogen>_sero_hard   – MAP call (prob ≥ 0.5)
 #      ‑ <pathogen>_w_soft      – weight = p_sero_soft
 #      ‑ <pathogen>_w_hard      – weight = 2 × |p – 0.5|
-#  ∙ Saves fitted models to: pathogen_mixture_model_fits.rds
-#  ∙ Writes phenotype & weight files into quickdraws_input/, mirroring Script 02
+#  ∙ Writes phenotype & weight files into quickdraws_input/
 ################################################################################
 
 # --- 1. SETUP & PACKAGES -------------------------------------------------------
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(tidyverse, mclust, furrr, glue, data.table, here)
-
-plan(multisession, workers = availableCores() - 1)
+pacman::p_load(tidyverse, glue, data.table, here, binom)
 
 # Ensure output directory exists ------------------------------------------------
 if (!dir.exists("quickdraws_input")) dir.create("quickdraws_input")
@@ -40,159 +36,114 @@ pathogen_map <- list(
   EBV   = c("ebv_vca",  "ebv_ebna1", "ebv_zebra", "ebv_ead"),
   CMV   = c("cmv_pp150", "cmv_pp52",  "cmv_pp28"),
   HHV6  = c("hhv6_ie1a", "hhv6_ie1b", "hhv6_p101k"),
-  # HBV and HCV removed (too rare for reliable mixture fitting)
-  # HPV16 removed (not available in phenotype data)
   CT    = c("ct_pgp3",  "ct_mompa",  "ct_mompd", "ct_tarpf1", "ct_tarpf2"),
   HP    = c("hp_caga",  "hp_vaca",  "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
 )
 
-# --- 4. HELPER FUNCTIONS -------------------------------------------------------
+# --- 4. COMBINATION LOGIC -------------------------------------------------------
 
-# Get the *_IgG_raw column names for a set of antigens -------------------------
-get_igg_cols <- function(antigens) glue("{antigens}_IgG_raw")
-
-# Get per-antigen soft probability columns -------------------------------------
-get_soft_cols <- function(antigens) glue("{antigens}_sero_soft")
-
-# Fit pathogen-level mixture ----------------------------------------------------
-fit_pathogen_mixture <- function(pathogen, antigens, data_tbl) {
-  cat("\n-- Fitting", pathogen, "(", length(antigens), "antigens)…\n")
-
-  # Keep only antigens present in the data
-  igg_cols  <- intersect(get_igg_cols(antigens), names(data_tbl))
-  soft_cols <- intersect(get_soft_cols(antigens), names(data_tbl))
-
-  if (length(igg_cols) < 2) {
-    warning("  -> Skipping ", pathogen, ": need ≥2 antigen columns, found ", length(igg_cols))
-    return(NULL)
-  }
-
-  # Assemble data matrix (log-MFI); mean-impute NAs for mixture fitting
-  mat <- data_tbl %>% select(all_of(igg_cols)) %>% as.matrix()
-  for (j in seq_len(ncol(mat))) {
-    col_mean <- mean(mat[, j], na.rm = TRUE)
-    if (is.finite(col_mean)) {
-      mat[is.na(mat[, j]), j] <- col_mean
-    }
-  }
-  # Drop constant columns (zero variance) which break mclust
-  vars <- apply(mat, 2, var)
-  if (any(vars == 0 | is.na(vars))) {
-    drop_cols <- which(vars == 0 | is.na(vars))
-    cat("  -> Dropping", length(drop_cols), "constant columns for", pathogen, "\n")
-    mat <- mat[, -drop_cols, drop = FALSE]
-    igg_cols <- igg_cols[-drop_cols]
-  }
-
-  if (ncol(mat) < 2) {
-    warning("  -> Skipping ", pathogen, ": <2 variable antigen columns after filtering.")
-    return(NULL)
-  }
-
-  # Initialise with per-antigen soft probabilities (if available)
-  init_class <- NULL
-  if (length(soft_cols) == length(igg_cols)) {
-    p_soft_mat <- data_tbl %>% select(all_of(soft_cols)) %>% as.matrix()
-    row_means  <- rowMeans(p_soft_mat, na.rm = TRUE)
-    row_means[is.na(row_means)] <- 0
-    init_class <- ifelse(row_means > 0.5, 2, 1)
-  }
-
-  # --- Robust mixture fitting ---
-  result <- tryCatch({
-      m <- Mclust(mat, G = 2, modelNames = "VVV",
-                  initialization = list(classification = init_class), verbose = FALSE)
-
-      if (is.null(m)) { # Mclust can return NULL on failure
-          warning("  -> Mclust returned NULL for ", pathogen, ". Skipping.")
-          return(NULL)
-      }
-
-      # Identify positive component = larger average log-MFI across antigens
-      comp_means <- m$parameters$mean
-      if (is.null(dim(comp_means))) comp_means <- matrix(comp_means, nrow = 1)
-      pos_comp <- which.max(colSums(comp_means))
-
-      p_soft <- m$z[, pos_comp]
-      p_soft[is.na(p_soft)] <- 0
-
-      pheno_data <- tibble(
-        FID = data_tbl$FID,
-        IID = data_tbl$IID,
-        !!glue("{tolower(pathogen)}_sero_soft") := p_soft,
-        !!glue("{tolower(pathogen)}_sero_hard") := if_else(p_soft >= 0.5, 1, 0),
-        !!glue("{tolower(pathogen)}_w_soft")    := p_soft,
-        !!glue("{tolower(pathogen)}_w_hard")    := 2 * abs(p_soft - 0.5)
-      )
-      list(pheno_data, model_fit = m)
-  }, error = function(e) {
-      warning("  -> Mclust failed for ", pathogen, " with error: ", e$message, ". Skipping.")
-      return(NULL)
-  })
-
-  return(result)
+#' Combine per-antigen probabilities using a Noisy-OR model.
+#' P(Pathogen+) = 1 - P(all antigens negative) = 1 - product(1 - P(antigen_i positive))
+#' @param p_vector A numeric vector of per-antigen probabilities for one person.
+#' @return A single combined probability.
+noisy_or <- function(p_vector) {
+  1 - prod(1 - p_vector, na.rm = TRUE)
 }
 
 # --- 5. MAIN LOOP --------------------------------------------------------------
-cat("\n--- Starting pathogen-level mixture fitting ---\n")
+cat("\n--- Starting pathogen-level probability combination ---\n")
 
-pathogen_results <- future_map(names(pathogen_map), function(p) {
-  fit_pathogen_mixture(p, pathogen_map[[p]], master_pheno)
-}, .options = furrr_options(seed = TRUE))
+pheno_tibbles <- map(names(pathogen_map), function(pathogen_name) {
+  cat("-- Processing", pathogen_name, "...\n")
+  
+  antigens <- pathogen_map[[pathogen_name]]
+  soft_cols <- glue("{antigens}_sero_soft")
+  
+  # Keep only antigens present in the master phenotype table
+  cols_to_use <- intersect(soft_cols, names(master_pheno))
+  
+  if (length(cols_to_use) < 1) {
+    warning("  -> Skipping ", pathogen_name, ": no 'sero_soft' columns found.")
+    return(NULL)
+  }
+  
+  # Extract the matrix of per-antigen probabilities
+  prob_matrix <- as.matrix(master_pheno[cols_to_use])
+  
+  # Apply the noisy-OR function row-wise
+  p_soft_combined <- apply(prob_matrix, 1, noisy_or)
+  
+  # Create the new phenotype tibble
+  tibble(
+    FID = master_pheno$FID,
+    IID = master_pheno$IID,
+    !!glue("{tolower(pathogen_name)}_sero_soft") := p_soft_combined,
+    !!glue("{tolower(pathogen_name)}_sero_hard") := if_else(p_soft_combined >= 0.5, 1, 0),
+    !!glue("{tolower(pathogen_name)}_w_soft")    := p_soft_combined,
+    !!glue("{tolower(pathogen_name)}_w_hard")    := 2 * abs(p_soft_combined - 0.5)
+  )
+})
 
-# Remove NULLs (skipped pathogens)
-valid_res <- pathogen_results[!map_lgl(pathogen_results, is.null)]
+# Filter out any NULL results from skipped pathogens
+pheno_tibbles <- compact(pheno_tibbles)
 
-if (length(valid_res) == 0) {
-  stop("No pathogen models were successfully fitted. Check that antigen columns exist in the phenotype data.")
+if (length(pheno_tibbles) == 0) {
+  stop("No pathogen phenotypes were generated.")
 }
-
-# Extract phenotype tibbles and model objects -----------------------------------
-pheno_tibbles <- map(valid_res, 1)
-model_fits    <- map(valid_res, 2)
-names(model_fits) <- tolower(names(pathogen_map))[!map_lgl(pathogen_results, is.null)]
-
-# Save model fits ----------------------------------------------------------------
-saveRDS(model_fits, "pathogen_mixture_model_fits.rds")
-cat("  -> Saved mixture models to pathogen_mixture_model_fits.rds\n")
 
 # --- 6. MERGE & WRITE OUTPUTS --------------------------------------------------
 cat("\n--- Writing phenotype & weight files ---\n")
 
-# Merge all pathogen phenotypes
+# Merge all pathogen phenotypes into a single table
 pathogen_pheno_tbl <- reduce(pheno_tibbles, left_join, by = c("FID", "IID"))
 
 # Write combined phenotype table
 write_tsv(pathogen_pheno_tbl, "quickdraws_input/phenotypes_pathogen.tsv")
 cat("  -> Wrote quickdraws_input/phenotypes_pathogen.tsv\n")
 
-# Weight files (soft + hard) ----------------------------------------------------
-for (pathogen in names(pathogen_map)) {
-  soft_col <- glue("{tolower(pathogen)}_w_soft")
-  hard_col <- glue("{tolower(pathogen)}_w_hard")
-  if (all(c(soft_col, hard_col) %in% names(pathogen_pheno_tbl))) {
-    soft_w <- pathogen_pheno_tbl %>% select(FID, IID, Weight = !!soft_col)
-    write_tsv(soft_w, glue("quickdraws_input/{tolower(pathogen)}_p_soft.weights"))
+# Write individual weight files (soft + hard) for each pathogen
+for (pathogen_tibble in pheno_tibbles) {
+  pathogen_name_lower <- str_remove(names(pathogen_tibble)[3], "_sero_soft")
+  
+  soft_col <- glue("{pathogen_name_lower}_w_soft")
+  hard_col <- glue("{pathogen_name_lower}_w_hard")
 
-    hard_w <- pathogen_pheno_tbl %>% select(FID, IID, Weight = !!hard_col)
-    write_tsv(hard_w, glue("quickdraws_input/{tolower(pathogen)}_sero_hard.weights"))
+  if (all(c(soft_col, hard_col) %in% names(pathogen_tibble))) {
+    soft_w <- pathogen_tibble %>% select(FID, IID, Weight = !!sym(soft_col))
+    write_tsv(soft_w, glue("quickdraws_input/{pathogen_name_lower}_p_soft.weights"))
+
+    hard_w <- pathogen_tibble %>% select(FID, IID, Weight = !!sym(hard_col))
+    write_tsv(hard_w, glue("quickdraws_input/{pathogen_name_lower}_sero_hard.weights"))
   }
 }
 cat("  -> Wrote per-pathogen weight files.\n")
 
+
 # --- 7. SEROPREVALENCE SUMMARY ----------------------------------------------
-cat("\n--- Seroprevalence estimates (hard calls) ---\n")
-seroprev <- map_dbl(names(pathogen_map), function(p) {
-  col <- glue("{tolower(p)}_sero_hard")
-  if (col %in% names(pathogen_pheno_tbl)) {
-    mean(pathogen_pheno_tbl[[col]] == 1, na.rm = TRUE)
-  } else NA_real_
+cat("\n--- Seroprevalence estimates (p_hard with 95% CI) ---\n")
+
+# Use a loop to calculate seroprevalence and CI for each pathogen
+successful_pathogens <- map_chr(pheno_tibbles, ~str_remove(names(.x)[3], "_sero_soft"))
+
+seroprev_list <- map(successful_pathogens, function(p_name_lower) {
+  hard_call_col <- glue("{p_name_lower}_sero_hard")
+  
+  counts <- table(pathogen_pheno_tbl[[hard_call_col]])
+  k <- if ("1" %in% names(counts)) counts["1"] else 0
+  n <- sum(counts)
+  ci <- binom.confint(k, n, methods = "wilson")
+  
+  tibble(
+    pathogen = toupper(p_name_lower),
+    n_total = n,
+    n_positive = k,
+    seroprevalence_pct = round(ci$mean * 100, 2),
+    ci_lower_pct = round(ci$lower * 100, 2),
+    ci_upper_pct = round(ci$upper * 100, 2)
+  )
 })
 
-seroprev_tbl <- tibble(
-  pathogen = names(pathogen_map),
-  seroprevalence = round(seroprev * 100, 2)
-)
+seroprev_tbl <- bind_rows(seroprev_list)
 
 print(seroprev_tbl)
 
