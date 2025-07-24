@@ -75,37 +75,62 @@ fit_pathogen_mixture <- function(pathogen, antigens, data_tbl) {
       mat[is.na(mat[, j]), j] <- col_mean
     }
   }
+  # Drop constant columns (zero variance) which break mclust
+  vars <- apply(mat, 2, var)
+  if (any(vars == 0 | is.na(vars))) {
+    drop_cols <- which(vars == 0 | is.na(vars))
+    cat("  -> Dropping", length(drop_cols), "constant columns for", pathogen, "\n")
+    mat <- mat[, -drop_cols, drop = FALSE]
+    igg_cols <- igg_cols[-drop_cols]
+  }
+
+  if (ncol(mat) < 2) {
+    warning("  -> Skipping ", pathogen, ": <2 variable antigen columns after filtering.")
+    return(NULL)
+  }
 
   # Initialise with per-antigen soft probabilities (if available)
   init_class <- NULL
   if (length(soft_cols) == length(igg_cols)) {
     p_soft_mat <- data_tbl %>% select(all_of(soft_cols)) %>% as.matrix()
     row_means  <- rowMeans(p_soft_mat, na.rm = TRUE)
-    # NA rows fall back to 0 (assume seronegative)
     row_means[is.na(row_means)] <- 0
-    init_class <- ifelse(row_means > 0.5, 2, 1)  # mclust classes are 1/2
+    init_class <- ifelse(row_means > 0.5, 2, 1)
   }
 
-  # Fit 2-component full-covariance Gaussian mixture
-  m <- Mclust(mat, G = 2, modelNames = "VVV",
-              initialization = list(classification = init_class))
+  # --- Robust mixture fitting ---
+  result <- tryCatch({
+      m <- Mclust(mat, G = 2, modelNames = "VVV",
+                  initialization = list(classification = init_class), verbose = FALSE)
 
-  # Identify positive component = larger average log-MFI across antigens
-  comp_means <- m$parameters$mean  # matrix(antigen × component)
-  pos_comp <- which.max(colSums(comp_means))
+      if (is.null(m)) { # Mclust can return NULL on failure
+          warning("  -> Mclust returned NULL for ", pathogen, ". Skipping.")
+          return(NULL)
+      }
 
-  p_soft <- m$z[, pos_comp]
-  p_soft[is.na(p_soft)] <- 0  # should not happen
+      # Identify positive component = larger average log-MFI across antigens
+      comp_means <- m$parameters$mean
+      if (is.null(dim(comp_means))) comp_means <- matrix(comp_means, nrow = 1)
+      pos_comp <- which.max(colSums(comp_means))
 
-  tibble(
-    FID = data_tbl$FID,
-    IID = data_tbl$IID,
-    !!glue("{tolower(pathogen)}_sero_soft") := p_soft,
-    !!glue("{tolower(pathogen)}_sero_hard") := if_else(p_soft >= 0.5, 1, 0),
-    !!glue("{tolower(pathogen)}_w_soft")    := p_soft,
-    !!glue("{tolower(pathogen)}_w_hard")    := 2 * abs(p_soft - 0.5)
-  ) %>%
-    list(model_fit = m)
+      p_soft <- m$z[, pos_comp]
+      p_soft[is.na(p_soft)] <- 0
+
+      pheno_data <- tibble(
+        FID = data_tbl$FID,
+        IID = data_tbl$IID,
+        !!glue("{tolower(pathogen)}_sero_soft") := p_soft,
+        !!glue("{tolower(pathogen)}_sero_hard") := if_else(p_soft >= 0.5, 1, 0),
+        !!glue("{tolower(pathogen)}_w_soft")    := p_soft,
+        !!glue("{tolower(pathogen)}_w_hard")    := 2 * abs(p_soft - 0.5)
+      )
+      list(pheno_data, model_fit = m)
+  }, error = function(e) {
+      warning("  -> Mclust failed for ", pathogen, " with error: ", e$message, ". Skipping.")
+      return(NULL)
+  })
+
+  return(result)
 }
 
 # --- 5. MAIN LOOP --------------------------------------------------------------
