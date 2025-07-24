@@ -40,8 +40,7 @@ pathogen_map <- list(
   EBV   = c("ebv_vca",  "ebv_ebna1", "ebv_zebra", "ebv_ead"),
   CMV   = c("cmv_pp150", "cmv_pp52",  "cmv_pp28"),
   HHV6  = c("hhv6_ie1a", "hhv6_ie1b", "hhv6_p101k"),
-  HBV   = c("hbv_hbc",  "hbv_hbe"),
-  HCV   = c("hcv_core", "hcv_ns3"),
+  # HBV and HCV removed (too rare for reliable mixture fitting)
   HPV16 = c("hpv16_l1", "hpv16_e6",  "hpv16_e7"),
   CT    = c("ct_pgp3",  "ct_mompa",  "ct_mompd", "ct_tarpf1", "ct_tarpf2", "ct_porb"),
   HP    = c("hp_caga",  "hp_vaca",  "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
@@ -153,5 +152,24 @@ for (pathogen in names(pathogen_map)) {
   }
 }
 cat("  -> Wrote per-pathogen weight files.\n")
+
+# --- 7. SEROPREVALENCE SUMMARY ----------------------------------------------
+cat("\n--- Seroprevalence estimates (hard calls) ---\n")
+seroprev <- map_dbl(names(pathogen_map), function(p) {
+  col <- glue("{tolower(p)}_sero_hard")
+  if (col %in% names(pathogen_pheno_tbl)) {
+    mean(pathogen_pheno_tbl[[col]] == 1, na.rm = TRUE)
+  } else NA_real_
+})
+
+seroprev_tbl <- tibble(
+  pathogen = names(pathogen_map),
+  seroprevalence = round(seroprev * 100, 2)
+)
+
+print(seroprev_tbl)
+
+write_tsv(seroprev_tbl, "quickdraws_input/pathogen_seroprevalence.tsv")
+cat("  -> Wrote seroprevalence summary to quickdraws_input/pathogen_seroprevalence.tsv\n")
 
 cat("\n--- Script 04 complete ---\n") 
