@@ -41,7 +41,7 @@ pathogen_map <- list(
   CMV   = c("cmv_pp150", "cmv_pp52",  "cmv_pp28"),
   HHV6  = c("hhv6_ie1a", "hhv6_ie1b", "hhv6_p101k"),
   # HBV and HCV removed (too rare for reliable mixture fitting)
-  HPV16 = c("hpv16_l1", "hpv16_e6",  "hpv16_e7"),
+  # HPV16 removed (not available in phenotype data)
   CT    = c("ct_pgp3",  "ct_mompa",  "ct_mompd", "ct_tarpf1", "ct_tarpf2", "ct_porb"),
   HP    = c("hp_caga",  "hp_vaca",  "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
 )
@@ -118,7 +118,9 @@ pathogen_results <- future_map(names(pathogen_map), function(p) {
 # Remove NULLs (skipped pathogens)
 valid_res <- pathogen_results[!map_lgl(pathogen_results, is.null)]
 
-if (length(valid_res) == 0) stop("No pathogen models were fitted.")
+if (length(valid_res) == 0) {
+  stop("No pathogen models were successfully fitted. Check that antigen columns exist in the phenotype data.")
+}
 
 # Extract phenotype tibbles and model objects -----------------------------------
 pheno_tibbles <- map(valid_res, 1)
