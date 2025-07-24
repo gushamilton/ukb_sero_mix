@@ -1,17 +1,15 @@
 ################################################################################
 #   UKB SEROLOGY: PATHOGEN-LEVEL PHENOTYPES (BAYESIAN REGRESSION + IMPUTATION) - SCRIPT 07
 ################################################################################
-#  ▸ Strategy: Extend script 06 to handle missing antigen values directly in the
-#    Bayesian model. Instead of dropping individuals with missing antigens, we
-#    model missing values as parameters that get imputed during MCMC sampling.
+#  ▸ Strategy: Use multiple imputation (mice) to handle missing antigen values,
+#    then run Bayesian regression on each imputed dataset and pool results.
 #  ▸ This allows us to use ALL individuals, not just those with complete antigen data.
-#  ▸ Missing values are imputed using correlations between antigens and any available
-#    covariates (age, sex, etc.).
+#  ▸ Missing values are imputed using correlations between antigens.
 ################################################################################
 
 # --- 1. PACKAGES --------------------------------------------------------------
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(tidyverse, glue, brms, future, here, bayestestR)
+pacman::p_load(tidyverse, glue, brms, future, here, bayestestR, mice)
 
 plan(multisession, workers = max(1, availableCores() - 1))
 options(mc.cores = max(1, availableCores() - 1))
@@ -51,7 +49,7 @@ make_label <- function(df, antigens, rule){
   }
 }
 
-# --- 4. Bayesian regression with missing data imputation ---------------------
+# --- 4. Multiple Imputation + Bayesian Regression ----------------------------
 results <- list()
 model_summaries <- list()
 
@@ -87,70 +85,116 @@ for (pth in names(pathogen_map)) {
   set.seed(42)
   if (nrow(df) > 2000) df_model <- slice_sample(df, n = 200) else df_model <- df
 
-  # Build formula with missing data handling
-  # brms will automatically handle missing predictors by treating them as parameters
-  rhs <- paste(soft_cols, collapse = " + ")
-  brm_formula <- bf(as.formula(paste("z ~", rhs)), family = bernoulli(link = "logit"))
+  # Multiple Imputation using mice
+  cat(glue("\nPerforming multiple imputation for {pth}...\n"))
+  
+  # Prepare data for imputation (only soft probabilities)
+  imp_data <- df_model[soft_cols]
+  
+  # Set up imputation method - use predictive mean matching for continuous data
+  imp_method <- rep("pmm", length(soft_cols))
+  names(imp_method) <- soft_cols
+  
+  # Perform multiple imputation
+  n_imp <- 5  # Number of imputations
+  imp <- mice(imp_data, m = n_imp, method = imp_method, 
+              maxit = 10, seed = 42, print = FALSE)
+  
+  cat(glue("Created {n_imp} imputed datasets\n"))
 
-  cat(glue("\nFitting Bayesian logistic model for {pth} on {nrow(df_model)} individuals (with missing data imputation)...\n"))
-
-  # Fit model with missing data imputation
-  fit <- brm(brm_formula, data = df_model,
-             chains = 2, iter = 2000, warmup = 500,
-             refresh = 0,
-             prior = set_prior("normal(0,1)", class = "b"),
-             # Enable missing data imputation
-             missing = "mi")
-
-  # Store model summary
-  model_summaries[[pth]] <- summary(fit)
-
-  # Predict on ALL individuals (including those with missing data)
-  # brms will impute missing values during prediction
-  pred_full <- fitted(fit, newdata = df, scale = "response", probs = c(0.025, 0.25, 0.75, 0.975))
-  pi_hat <- pred_full[, "Estimate"]
-  pi_lower <- pred_full[, "Q2.5"]
-  pi_upper <- pred_full[, "Q97.5"]
-  pi_ci_width <- pi_upper - pi_lower
-
+  # Fit Bayesian regression on each imputed dataset
+  imp_results <- list()
+  imp_models <- list()
+  
+  for (i in 1:n_imp) {
+    cat(glue("Fitting Bayesian model on imputed dataset {i}/{n_imp}...\n"))
+    
+    # Get imputed dataset
+    imp_df <- complete(imp, i)
+    imp_df$z <- df_model$z  # Add back the target variable
+    
+    # Build formula
+    rhs <- paste(soft_cols, collapse = " + ")
+    brm_formula <- bf(as.formula(paste("z ~", rhs)), family = bernoulli(link = "logit"))
+    
+    # Fit model
+    fit <- brm(brm_formula, data = imp_df,
+               chains = 2, iter = 1000, warmup = 250,  # Reduced for speed
+               refresh = 0,
+               prior = set_prior("normal(0,1)", class = "b"))
+    
+    imp_models[[i]] <- fit
+    
+    # Get predictions
+    pred <- fitted(fit, newdata = imp_df, scale = "response", probs = c(0.025, 0.25, 0.75, 0.975))
+    
+    imp_results[[i]] <- tibble(
+      FID = df_model$FID,
+      IID = df_model$IID,
+      pi_hat = pred[, "Estimate"],
+      pi_lower = pred[, "Q2.5"],
+      pi_upper = pred[, "Q97.5"],
+      pi_ci_width = pred[, "Q97.5"] - pred[, "Q2.5"]
+    )
+  }
+  
+  # Pool results across imputations (Rubin's rules)
+  pooled_results <- tibble(
+    FID = df_model$FID,
+    IID = df_model$IID,
+    pi_hat = rowMeans(sapply(imp_results, function(x) x$pi_hat)),
+    pi_lower = rowMeans(sapply(imp_results, function(x) x$pi_lower)),
+    pi_upper = rowMeans(sapply(imp_results, function(x) x$pi_upper)),
+    pi_ci_width = rowMeans(sapply(imp_results, function(x) x$pi_ci_width))
+  )
+  
   # Multiple serostatus thresholds
   thresholds <- c(0.3, 0.5, 0.7, 0.9)
   serostatus_cols <- list()
   
   for (thresh in thresholds) {
     col_name <- glue("{tolower(pth)}_sero_hard_{thresh*100}")
-    serostatus_cols[[col_name]] <- as.integer(pi_hat >= thresh)
+    serostatus_cols[[col_name]] <- as.integer(pooled_results$pi_hat >= thresh)
   }
 
-  # Calculate seroprevalence using Bayesian posterior samples
-  # Get posterior samples for all predictions (including imputed)
-  post_samples <- posterior_epred(fit, newdata = df, draws = 1000)
+  # Calculate pooled seroprevalence
+  seroprevalence <- mean(pooled_results$pi_hat >= 0.5)
   
-  # Calculate seroprevalence for each posterior sample
-  seroprev_samples <- apply(post_samples, 1, function(x) mean(x >= 0.5))
+  # Bootstrap CI for seroprevalence (accounting for imputation uncertainty)
+  set.seed(42)
+  n_boot <- 1000
+  boot_samples <- numeric(n_boot)
   
-  # Get credible intervals from posterior distribution
-  seroprev_ci <- quantile(seroprev_samples, c(0.025, 0.975))
-  seroprevalence <- mean(seroprev_samples)
+  for (b in 1:n_boot) {
+    # Sample one imputed dataset
+    imp_idx <- sample(1:n_imp, 1)
+    boot_seroprev <- mean(imp_results[[imp_idx]]$pi_hat >= 0.5)
+    boot_samples[b] <- boot_seroprev
+  }
+  
+  seroprev_ci <- quantile(boot_samples, c(0.025, 0.975))
 
   results[[pth]] <- tibble(
-    FID = df$FID,
-    IID = df$IID,
-    !!glue("{tolower(pth)}_sero_soft") := pi_hat,
-    !!glue("{tolower(pth)}_sero_soft_lower") := pi_lower,
-    !!glue("{tolower(pth)}_sero_soft_upper") := pi_upper,
-    !!glue("{tolower(pth)}_sero_soft_ci_width") := pi_ci_width,
+    FID = pooled_results$FID,
+    IID = pooled_results$IID,
+    !!glue("{tolower(pth)}_sero_soft") := pooled_results$pi_hat,
+    !!glue("{tolower(pth)}_sero_soft_lower") := pooled_results$pi_lower,
+    !!glue("{tolower(pth)}_sero_soft_upper") := pooled_results$pi_upper,
+    !!glue("{tolower(pth)}_sero_soft_ci_width") := pooled_results$pi_ci_width,
     !!!serostatus_cols,
-    !!glue("{tolower(pth)}_w_soft")    := pi_hat,
-    !!glue("{tolower(pth)}_w_hard")    := 2 * abs(pi_hat - 0.5)
+    !!glue("{tolower(pth)}_w_soft")    := pooled_results$pi_hat,
+    !!glue("{tolower(pth)}_w_hard")    := 2 * abs(pooled_results$pi_hat - 0.5)
   )
   
+  # Store model summary from first imputation
+  model_summaries[[pth]] <- summary(imp_models[[1]])
+  
   # Print summary statistics
-  cat(glue("\n--- {pth} Summary (with imputation) ---\n"))
+  cat(glue("\n--- {pth} Summary (with multiple imputation) ---\n"))
   cat(glue("Seroprevalence (≥0.5): {scales::percent(seroprevalence, accuracy = 0.1)} ({scales::percent(seroprev_ci[1], accuracy = 0.1)} - {scales::percent(seroprev_ci[2], accuracy = 0.1)})\n"))
-  cat(glue("Mean CI width: {round(mean(pi_ci_width), 3)}\n"))
-  cat(glue("Coefficients:\n"))
-  coef_summary <- summary(fit)$fixed
+  cat(glue("Mean CI width: {round(mean(pooled_results$pi_ci_width), 3)}\n"))
+  cat(glue("Coefficients (from first imputation):\n"))
+  coef_summary <- summary(imp_models[[1]])$fixed
   for (i in 2:nrow(coef_summary)) {  # Skip intercept
     antigen_name <- rownames(coef_summary)[i]
     antigen_clean <- str_remove(antigen_name, "_sero_soft")
