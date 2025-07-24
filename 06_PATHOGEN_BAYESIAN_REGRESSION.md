@@ -38,7 +38,7 @@ logit(π_j) = β₀  + Σ_k β_k · p_{jk}
 ### Credible Intervals
 * **Individual-level CIs**: Each soft probability comes with 95% credible intervals (`*_sero_soft_lower`, `*_sero_soft_upper`).
 * **CI width**: Uncertainty measure (`*_sero_soft_ci_width`) for quality assessment.
-* **Population-level CIs**: Bootstrap-based credible intervals for seroprevalence estimates.
+* **Population-level CIs**: Posterior-based credible intervals for seroprevalence estimates using `posterior_epred()`.
 
 ### Multiple Serostatus Thresholds
 The script generates multiple binary classifications:
@@ -55,7 +55,7 @@ The script generates multiple binary classifications:
 
 ### Model Diagnostics
 * **Coefficient summaries**: Posterior means and credible intervals for each antigen weight.
-* **Seroprevalence estimates**: With bootstrap-based credible intervals.
+* **Seroprevalence estimates**: With posterior-based credible intervals.
 * **Mean CI width**: Average uncertainty across individuals.
 
 ## Outputs

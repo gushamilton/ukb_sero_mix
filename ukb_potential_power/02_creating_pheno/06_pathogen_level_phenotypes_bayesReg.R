@@ -111,21 +111,16 @@ for (pth in names(pathogen_map)) {
     serostatus_cols[[col_name]] <- as.integer(pi_hat >= thresh)
   }
 
-  # Calculate seroprevalence with credible intervals
-  n_positive <- sum(pi_hat >= 0.5)
-  seroprevalence <- n_positive / length(pi_hat)
+  # Calculate seroprevalence using Bayesian posterior samples
+  # Get posterior samples for all predictions
+  post_samples <- posterior_epred(fit, newdata = df, draws = 1000)
   
-  # Bootstrap credible intervals for seroprevalence
-  set.seed(42)
-  n_boot <- 1000
-  boot_samples <- matrix(0, n_boot, 1)
+  # Calculate seroprevalence for each posterior sample
+  seroprev_samples <- apply(post_samples, 1, function(x) mean(x >= 0.5))
   
-  for (i in 1:n_boot) {
-    boot_idx <- sample(1:length(pi_hat), replace = TRUE)
-    boot_samples[i] <- sum(pi_hat[boot_idx] >= 0.5) / length(pi_hat[boot_idx])
-  }
-  
-  seroprev_ci <- quantile(boot_samples, c(0.025, 0.975))
+  # Get credible intervals from posterior distribution
+  seroprev_ci <- quantile(seroprev_samples, c(0.025, 0.975))
+  seroprevalence <- mean(seroprev_samples)
 
   results[[pth]] <- tibble(
     FID = df$FID,
