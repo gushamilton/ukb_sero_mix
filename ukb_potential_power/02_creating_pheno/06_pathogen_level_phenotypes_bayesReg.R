@@ -12,7 +12,7 @@
 
 # --- 1. PACKAGES --------------------------------------------------------------
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(tidyverse, glue, brms, future, here)
+pacman::p_load(tidyverse, glue, brms, future, here, bayestestR, patchwork)
 
 plan(multisession, workers = max(1, availableCores() - 1))
 options(mc.cores = max(1, availableCores() - 1))
@@ -50,6 +50,8 @@ make_label <- function(df, antigens, rule){
 
 # --- 4. Loop over pathogens ---------------------------------------------------
 results <- list()
+model_summaries <- list()
+diagnostic_plots <- list()
 
 for (pth in names(pathogen_map)) {
   antigens <- pathogen_map[[pth]]
@@ -68,7 +70,7 @@ for (pth in names(pathogen_map)) {
 
   # Subsample for development speed -----------------------------------------
   set.seed(42)
-  if (nrow(df) > 2000) df_model <- slice_sample(df, n = 2000) else df_model <- df
+  if (nrow(df) > 2000) df_model <- slice_sample(df, n = 200) else df_model <- df
 
   # Build formula -----------------------------------------------------------
   rhs <- paste(soft_cols, collapse = " + ")
@@ -81,22 +83,125 @@ for (pth in names(pathogen_map)) {
              refresh = 0,
              prior = set_prior("normal(0,1)", class = "b"))
 
-  # Predict on *all* complete-case rows (not just the subsample)
-  pi_hat <- fitted(fit, newdata = df, scale = "response")[, "Estimate"]
+  # Store model summary
+  model_summaries[[pth]] <- summary(fit)
+  
+  # Create diagnostic plots
+  p1 <- pp_check(fit, type = "dens_overlay", nsamples = 100) + 
+    ggtitle(glue("{pth}: Posterior Predictive Check"))
+  
+  p2 <- plot(fit, variable = "b_", regex = TRUE) + 
+    ggtitle(glue("{pth}: Coefficient Posteriors"))
+  
+  diagnostic_plots[[pth]] <- p1 + p2 + plot_layout(ncol = 2)
+
+  # Predict on *all* complete-case rows with credible intervals
+  pred_full <- fitted(fit, newdata = df, scale = "response", probs = c(0.025, 0.25, 0.75, 0.975))
+  pi_hat <- pred_full[, "Estimate"]
+  pi_lower <- pred_full[, "Q2.5"]
+  pi_upper <- pred_full[, "Q97.5"]
+  pi_ci_width <- pi_upper - pi_lower
+
+  # Multiple serostatus thresholds
+  thresholds <- c(0.3, 0.5, 0.7, 0.9)
+  serostatus_cols <- list()
+  
+  for (thresh in thresholds) {
+    col_name <- glue("{tolower(pth)}_sero_hard_{thresh*100}")
+    serostatus_cols[[col_name]] <- as.integer(pi_hat >= thresh)
+  }
+
+  # Calculate seroprevalence with credible intervals
+  n_positive <- sum(pi_hat >= 0.5)
+  seroprevalence <- n_positive / length(pi_hat)
+  
+  # Bootstrap credible intervals for seroprevalence
+  set.seed(42)
+  n_boot <- 1000
+  boot_samples <- matrix(0, n_boot, 1)
+  
+  for (i in 1:n_boot) {
+    boot_idx <- sample(1:length(pi_hat), replace = TRUE)
+    boot_samples[i] <- sum(pi_hat[boot_idx] >= 0.5) / length(pi_hat[boot_idx])
+  }
+  
+  seroprev_ci <- quantile(boot_samples, c(0.025, 0.975))
 
   results[[pth]] <- tibble(
     FID = df$FID,
     IID = df$IID,
     !!glue("{tolower(pth)}_sero_soft") := pi_hat,
-    !!glue("{tolower(pth)}_sero_hard") := as.integer(pi_hat >= 0.5),
+    !!glue("{tolower(pth)}_sero_soft_lower") := pi_lower,
+    !!glue("{tolower(pth)}_sero_soft_upper") := pi_upper,
+    !!glue("{tolower(pth)}_sero_soft_ci_width") := pi_ci_width,
+    !!!serostatus_cols,
     !!glue("{tolower(pth)}_w_soft")    := pi_hat,
     !!glue("{tolower(pth)}_w_hard")    := 2 * abs(pi_hat - 0.5)
   )
+  
+  # Print summary statistics
+  cat(glue("\n--- {pth} Summary ---\n"))
+  cat(glue("Seroprevalence (≥0.5): {seroprevalence:.1%} ({seroprev_ci[1]:.1%} - {seroprev_ci[2]:.1%})\n"))
+  cat(glue("Mean CI width: {mean(pi_ci_width):.3f}\n"))
+  cat(glue("Coefficients:\n"))
+  coef_summary <- summary(fit)$fixed
+  for (i in 2:nrow(coef_summary)) {  # Skip intercept
+    antigen_name <- rownames(coef_summary)[i]
+    antigen_clean <- str_remove(antigen_name, "_sero_soft")
+    cat(glue("  {antigen_clean}: {coef_summary[i, 'Estimate']:.3f} ({coef_summary[i, 'l-95% CI']:.3f}, {coef_summary[i, 'u-95% CI']:.3f})\n"))
+  }
 }
 
+# --- 5. Create comprehensive diagnostic plots --------------------------------
+cat("\nCreating diagnostic plots...\n")
+
+# Combined diagnostic plot
+all_diagnostics <- wrap_plots(diagnostic_plots, ncol = 2)
+ggsave("results/bayesian_regression_diagnostics.pdf", all_diagnostics, 
+       width = 12, height = 8, dpi = 300)
+
+# Distribution plots for each pathogen
+dist_plots <- list()
+for (pth in names(results)) {
+  p <- results[[pth]] %>%
+    ggplot(aes(x = !!sym(glue("{tolower(pth)}_sero_soft")))) +
+    geom_histogram(bins = 30, alpha = 0.7, fill = "steelblue") +
+    geom_vline(xintercept = 0.5, color = "red", linetype = "dashed") +
+    labs(title = glue("{pth}: Soft Probability Distribution"),
+         x = "Soft Probability", y = "Count") +
+    theme_minimal()
+  
+  dist_plots[[pth]] <- p
+}
+
+combined_dist <- wrap_plots(dist_plots, ncol = 2)
+ggsave("results/bayesian_regression_distributions.pdf", combined_dist, 
+       width = 12, height = 8, dpi = 300)
+
+# Seroprevalence comparison plot
+seroprev_data <- map_dfr(names(results), function(pth) {
+  tibble(
+    Pathogen = pth,
+    Seroprevalence = sum(results[[pth]][[glue("{tolower(pth)}_sero_hard_50")]]) / nrow(results[[pth]]),
+    Method = "Bayesian Regression"
+  )
+})
+
+seroprev_plot <- seroprev_data %>%
+  ggplot(aes(x = Pathogen, y = Seroprevalence, fill = Method)) +
+  geom_col(alpha = 0.8) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Seroprevalence Estimates by Pathogen",
+       y = "Seroprevalence", x = "Pathogen") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave("results/bayesian_regression_seroprevalence.pdf", seroprev_plot, 
+       width = 8, height = 6, dpi = 300)
+
+# --- 6. Combine results and write outputs ------------------------------------
 combined <- reduce(results, full_join, by = c("FID", "IID"))
 
-# --- 5. Write outputs ---------------------------------------------------------
 if (!dir.exists("quickdraws_input")) dir.create("quickdraws_input")
 
 write_tsv(combined, "quickdraws_input/phenotypes_pathogen_bayesReg.tsv")
@@ -112,4 +217,24 @@ for (pth in names(results)) {
             glue("quickdraws_input/{low}_sero_hard.weights"))
 }
 
+# Write seroprevalence summary
+seroprev_summary <- map_dfr(names(results), function(pth) {
+  res <- results[[pth]]
+  soft_col <- glue("{tolower(pth)}_sero_soft")
+  
+  tibble(
+    Pathogen = pth,
+    N_Total = nrow(res),
+    N_Positive_50 = sum(res[[glue("{tolower(pth)}_sero_hard_50")]]),
+    N_Positive_70 = sum(res[[glue("{tolower(pth)}_sero_hard_70")]]),
+    Seroprevalence_50 = N_Positive_50 / N_Total,
+    Seroprevalence_70 = N_Positive_70 / N_Total,
+    Mean_CI_Width = mean(res[[glue("{tolower(pth)}_sero_soft_ci_width")]])
+  )
+})
+
+write_tsv(seroprev_summary, "results/bayesian_regression_seroprevalence_summary.tsv")
+
+cat("\nDiagnostic plots saved to results/\n")
+cat("Seroprevalence summary saved to results/bayesian_regression_seroprevalence_summary.tsv\n")
 cat("Weight files written.\nScript 06 complete.\n") 
