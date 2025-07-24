@@ -7,8 +7,9 @@ This project implements a comprehensive workflow for performing a power-enhanced
 The central goal is to increase statistical power and discover novel genetic associations with pathogen exposure and antibody response. This is achieved by:
 
 1.  **Probabilistic Phenotyping**: Using two-component mixture models to convert continuous antibody titre data (MFI) into a posterior probability of seropositivity (`p_soft`). This retains information lost in binary classification.
-2.  **Multivariate Pathogen-Level Calls**: Combining evidence from multiple antigens for a single pathogen (e.g., EBV, CMV) into a unified, more robust serostatus call using multivariate mixture models.
+2.  **Bayesian Pathogen-Level Calls**: Combining evidence from multiple antigens for a single pathogen (e.g., EBV, CMV) into a unified, more robust serostatus call using Bayesian logistic regression.
 3.  **Comprehensive Analysis Strategy**: Testing for genetic effects on both binary serostatus and quantitative antibody levels, using a variety of weighted and unweighted models.
+4.  **Direct Paper Comparison**: Implementing exact Butler-Laporte et al. 2023 methodology for direct comparison with published results.
 
 ## Project Workflow
 
@@ -26,7 +27,11 @@ The analysis is structured as a clear, iterative pipeline. Each step is document
     *   **Goal**: Combine single-antigen data for multi-antigen pathogens (like EBV, CMV, HP) into a single, more reliable serostatus probability using multivariate mixture models.
     *   **Script**: `ukb_potential_power/02_creating_pheno/04_pathogen_level_phenotypes.R`
 
-4.  **[GWAS Analysis with Quickdraws](./04_GWAS_ANALYSIS.md)**
+4.  **[Bayesian Pathogen-Level Regression](./06_PATHOGEN_BAYESIAN_REGRESSION.md)**
+    *   **Goal**: Implement robust Bayesian logistic regression to combine per-antigen probabilities into pathogen-level serostatus, with comprehensive uncertainty quantification and direct comparison with Butler-Laporte et al. 2023.
+    *   **Script**: `ukb_potential_power/02_creating_pheno/06_pathogen_level_phenotypes_bayesReg.R`
+
+5.  **[GWAS Analysis with Quickdraws](./04_GWAS_ANALYSIS.md)**
     *   **Goal**: Execute a comprehensive GWAS using the generated phenotypes and a manifest-driven approach with the Quickdraws software.
     *   **Scripts**: `03_quickdraw_gwas/` contains the run plan and supporting scripts.
 
@@ -35,6 +40,7 @@ The analysis is structured as a clear, iterative pipeline. Each step is document
 -   **Phenotype & Covariate Files**: Located in `quickdraws_input/`, these files are formatted for direct use with Quickdraws and include master phenotype tables, covariate files, and per-analysis weight files.
 -   **GWAS Summary Statistics**: The ultimate output of the pipeline, ready for downstream analysis and interpretation.
 -   **Diagnostic Plots & Reports**: Various intermediate outputs used for quality control, such as mixture model fit diagnostics and seroprevalence estimates.
+-   **Comparison Files**: Direct comparison with Butler-Laporte et al. 2023 methodology for validation and benchmarking.
 
 ## Usage
 

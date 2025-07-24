@@ -24,14 +24,12 @@ logit(π_j) = β₀  + Σ_k β_k · p_{jk}
 ## Implementation Highlights (`06_pathogen_level_phenotypes_bayesReg.R`)
 
 1. Reads `phenotypes_master_postqc.tsv` for all `_sero_soft` and `_sero_hard` columns.
-2. Builds the UKB hard label per pathogen.
-3. Fits the above model with **brms** (Stan backend).
+2. Builds the UKB hard label per pathogen using exact Butler-Laporte et al. 2023 rules.
+3. Fits the above model with **brms** (Stan backend) on the full dataset.
 4. Extracts the posterior mean \(\hat π_j\) as the new
    * `{pathogen}_sero_soft`
    * `{pathogen}_sero_hard` = 1 if \(\hat π_j ≥ 0.5\).
-5. Writes
-   * `phenotypes_pathogen_bayesReg.tsv`
-   * weight files `{pathogen}_p_soft.weights` and `{pathogen}_sero_hard.weights`.
+5. Generates comprehensive outputs for GWAS comparison.
 
 ## Enhanced Features
 
@@ -47,11 +45,15 @@ The script generates multiple binary classifications:
 * `*_sero_hard_70`: ≥70% probability threshold (specific)
 * `*_sero_hard_90`: ≥90% probability threshold (very specific)
 
-### Diagnostic Plots
-* **Posterior Predictive Checks**: Model fit validation using `pp_check()`.
-* **Coefficient Posteriors**: Uncertainty in antigen weights.
-* **Distribution Plots**: Histograms of soft probabilities per pathogen.
-* **Seroprevalence Comparison**: Bar plots comparing estimates across pathogens.
+### Butler-Laporte Comparison
+* **Exact MFI thresholds**: Uses precise thresholds from Butler-Laporte et al. 2023 for direct paper comparison.
+* **Exact seropositivity rules**: Implements the exact rules from their Table 1.
+* **Comparison outputs**: Generates `{pathogen}_bl_hard.pheno` files for direct comparison.
+
+### Comprehensive Weights
+* **Soft phenotype weights**: `{pathogen}_bayes_soft.weights` using soft probability as weight.
+* **Hard phenotype weights**: `{pathogen}_bayes_hard.weights` using confidence (2 × |soft_prob - 0.5|) as weight.
+* **No weights for hard cutoffs**: Butler-Laporte and UKB hard cutoffs are deterministic.
 
 ### Model Diagnostics
 * **Coefficient summaries**: Posterior means and credible intervals for each antigen weight.
@@ -62,26 +64,43 @@ The script generates multiple binary classifications:
 
 ### Phenotype Files
 * `phenotypes_pathogen_bayesReg.tsv`: Main phenotype file with soft probabilities, CIs, and multiple thresholds.
-* `{pathogen}_p_soft.weights`: Weight files for soft phenotypes.
-* `{pathogen}_sero_hard.weights`: Weight files for hard phenotypes.
+* `phenotypes_gwas_comparison.tsv`: Combined file with all phenotype types for comparison.
+
+### Individual Phenotype Files
+* `{pathogen}_ukb_hard.pheno`: UKB rule hard cutoffs (noisy target).
+* `{pathogen}_bayes_hard.pheno`: Bayesian hard cutoffs (≥0.5).
+* `{pathogen}_bayes_soft.pheno`: Bayesian soft probabilities.
+
+### Weight Files
+* `{pathogen}_bayes_soft.weights`: Weights for soft phenotype GWAS.
+* `{pathogen}_bayes_hard.weights`: Weights for hard phenotype GWAS.
 
 ### Diagnostic Files
-* `results/bayesian_regression_diagnostics.pdf`: Model fit diagnostics.
-* `results/bayesian_regression_distributions.pdf`: Probability distributions.
-* `results/bayesian_regression_seroprevalence.pdf`: Seroprevalence comparison.
 * `results/bayesian_regression_seroprevalence_summary.tsv`: Summary statistics.
+* `results/gwas_comparison_summary.tsv`: Comparison table with all seroprevalence estimates.
+* `results/{pathogen}_antigen_vs_pathogen_scatters.pdf`: Scatter plots comparing individual antigens to pathogen-level probabilities.
 
-## Development vs. Production
+## Butler-Laporte et al. 2023 Implementation
 
-* While prototyping the script subsamples **200** complete cases per pathogen for speed. Comment-out the `slice_sample()` line to run on the full cohort.
-* Typical run-time on the subsample: ~1–2 minutes per pathogen on a laptop; full data will scale linearly.
+### MFI Thresholds (from Table 1)
+* **EBV**: VCA p18 (250), EBNA-1 (250), ZEBRA (100), EA-D (100)
+* **CMV**: pp150 (100), pp52 (150), pp28 (200)
+* **H. pylori**: CagA (400), VacA (100), OMP (170), GroEL (80), Catalase (180), UreA (130)
+* **C. trachomatis**: momp A (100), momp D (100), tarp-D F1 (100), tarp-D F2 (100), PorB (80), pGP3 (200)
+
+### Seropositivity Rules
+* **EBV**: Positive for 2 or more antigens
+* **CMV**: Positive for 2 or more antigens
+* **H. pylori**: Positive for 2 or more antigens, **except CagA**
+* **C. trachomatis**: Positive for pGP3 **OR** negative for pGP3 but positive for 2 out of 5 remaining antigens
 
 ## Advantages
 
 * **Fully Bayesian**: Uncertainty in β propagates into per-sample probabilities.
 * **Multiple thresholds**: Flexible serostatus classification for different use cases.
 * **Comprehensive diagnostics**: Model validation and uncertainty quantification.
-* **Automatically down-weights "weak" antigens** (small β) and amplifies informative ones.
+* **Direct paper comparison**: Exact implementation of Butler-Laporte methodology.
+* **Confidence-based weights**: Maximizes GWAS power by weighting uncertain calls appropriately.
 * **No convergence issues observed**; logistic regression is easy for HMC.
 
 ## Interpretation
@@ -97,6 +116,11 @@ The script generates multiple binary classifications:
 * **70% threshold**: High specificity, confident seropositive calls.
 * **90% threshold**: Very high specificity, excludes uncertain cases.
 
+### Weight Interpretation
+* **Soft weights**: Direct probability weighting for soft phenotype GWAS.
+* **Hard weights**: Confidence-based weighting (distance from 0.5) for hard phenotype GWAS.
+* Higher weights indicate more confident predictions.
+
 ### CI Width Interpretation
 * Narrow CIs indicate high confidence in the prediction.
 * Wide CIs suggest the model is uncertain, possibly due to conflicting antigen signals.
@@ -104,7 +128,7 @@ The script generates multiple binary classifications:
 ## Next Steps
 
 * Inspect posterior summaries (`summary(fit)`) to see which antigens carry the most weight.
-* Run posterior predictive checks: `pp_check(fit)`.
-* Remove subsampling and run on full UKB cohort before feeding phenotypes into Quickdraws GWAS.
-* Compare seroprevalence estimates across different thresholds.
-* Use CI width to identify individuals with uncertain classifications. 
+* Compare seroprevalence estimates with Butler-Laporte paper results.
+* Use CI width to identify individuals with uncertain classifications.
+* Run GWAS with both weighted and unweighted approaches to assess power gains.
+* Compare performance across different serostatus thresholds. 
