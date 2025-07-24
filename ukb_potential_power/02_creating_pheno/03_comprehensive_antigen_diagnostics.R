@@ -27,7 +27,7 @@ core_antigens <- c(
     "toxo_p22",
     "bkv_vp1", "jcv_vp1", "mcv_vp1",
     "hhv6_ie1a", "hhv6_ie1b", "hhv7_u14",
-    "ct_pgp3", "ct_mompd", "ct_tarpf2"
+    "ct_mompd", "ct_tarpf2"
 )
 
 # Antigen mapping (same as in main script)
@@ -85,8 +85,8 @@ filter(short_name %in% core_antigens)
 cat("Loading phenotype data...\n")
 
 # Load the master phenotype table
-if (file.exists("phenotypes_master.tsv")) {
-  master_pheno_table <- read_tsv("phenotypes_master.tsv", show_col_types = FALSE)
+if (file.exists("quickdraws_input/phenotypes_master_postqc.tsv")) {
+  master_pheno_table <- read_tsv("quickdraws_input/phenotypes_master_postqc.tsv", show_col_types = FALSE)
 } else {
   stop("Phenotype file not found. Please run 02_create_serology_phenotypes.R first.")
 }
@@ -116,12 +116,22 @@ if (file.exists("serology_export_title.tsv")) {
 cat("Data loaded for", ncol(data_clean) - 2, "antigens and", nrow(data_clean), "samples.\n")
 
 # Load the single, combined covariate file
-covar_table <- NULL
+covar_table <- NULL 
 if (file.exists("quickdraws_input/covariates_all.tsv")) {
   covar_table <- read_tsv("quickdraws_input/covariates_all.tsv", show_col_types = FALSE)
   cat("Loaded combined covariates from quickdraws_input/covariates_all.tsv\n")
 } else {
   warning("Combined covariate file not found. PC and other covariate-based plots will be skipped.")
+}
+
+# Extract latent factors from phenotype data for plotting
+latent_factors_data <- NULL
+if (all(c("latent_factor_1", "latent_factor_2", "latent_factor_igg") %in% names(master_pheno_table))) {
+  latent_factors_data <- master_pheno_table %>% 
+    select(FID, IID, latent_factor_1, latent_factor_2, latent_factor_igg)
+  cat("Extracted latent factors from phenotype data for plotting\n")
+} else {
+  warning("Latent factors not found in phenotype data. PC-based plots will be skipped.")
 }
 
 # --- 3. DIAGNOSTIC PLOTTING FUNCTIONS ---
@@ -448,10 +458,10 @@ plot_summary_stats <- function(antigen_name, pheno_data, raw_data, threshold) {
   return(p)
 }
 
-#' Plot 5: Scatter IgG vs PC1_assay_noise coloured by serostatus group
-plot_pc1_vs_igg <- function(antigen_name, pheno_data, covar_data) {
-  if (is.null(covar_data) || !"PC1_assay_noise" %in% names(covar_data)) {
-    return(ggplot() + annotate("text", x = 0.5, y = 0.5, label = "PC1_assay_noise data not available") + theme_void())
+#' Plot 5: Scatter IgG vs latent_factor_1 coloured by serostatus group
+plot_pc1_vs_igg <- function(antigen_name, pheno_data, latent_data) {
+  if (is.null(latent_data) || !"latent_factor_1" %in% names(latent_data)) {
+    return(ggplot() + annotate("text", x = 0.5, y = 0.5, label = "latent_factor_1 data not available") + theme_void())
   }
   igg_col  <- glue("{antigen_name}_IgG_raw")
   soft_col <- glue("{antigen_name}_sero_soft")
@@ -462,15 +472,15 @@ plot_pc1_vs_igg <- function(antigen_name, pheno_data, covar_data) {
   
   merged <- pheno_data %>%
     select(IID, igg = all_of(igg_col), prob = all_of(soft_col)) %>%
-    left_join(covar_data, by = "IID") %>%
-    filter(!is.na(igg) & !is.na(prob) & !is.na(PC1_assay_noise)) %>%
+    left_join(latent_data, by = "IID") %>%
+    filter(!is.na(igg) & !is.na(prob) & !is.na(latent_factor_1)) %>%
     mutate(group = case_when(
       prob > 0.95 ~ "Likely Seropositive (>0.95)",
       prob < 0.05 ~ "Likely Seronegative (<0.05)",
       TRUE        ~ "Ambiguous (0.05–0.95)"
     ))
   
-  p <- ggplot(merged, aes(x = exp(igg), y = PC1_assay_noise, colour = group)) +
+  p <- ggplot(merged, aes(x = exp(igg), y = latent_factor_1, colour = group)) +
     geom_point(alpha = 0.5, size = 0.6, stroke = 0) +
     scale_colour_manual(values = c(
       "Likely Seropositive (>0.95)" = "red",
@@ -479,19 +489,19 @@ plot_pc1_vs_igg <- function(antigen_name, pheno_data, covar_data) {
     )) +
     scale_x_log10(labels = scales::label_number(accuracy = 1)) +
     labs(
-      title = glue("IgG vs PC1_assay_noise: {antigen_name}"),
+      title = glue("IgG vs latent_factor_1: {antigen_name}"),
       x = "MFI (log scale)",
-      y = "PC1_assay_noise",
+      y = "latent_factor_1",
       colour = "Group"
     ) +
     theme_light()
   return(p)
 }
 
-#' Plot 8: PC1_assay_noise vs hard/soft classifications with trend lines
-plot_pc1_trends <- function(antigen_name, pheno_data, covar_data) {
-  if (is.null(covar_data) || !all(c("PC1_assay_noise", "PC1_seropositive") %in% names(covar_data))) {
-    return(ggplot() + annotate("text", x = 0.5, y = 0.5, label = "PC1 components not available") + theme_void())
+#' Plot 8: latent_factor_1 vs hard/soft classifications with trend lines
+plot_pc1_trends <- function(antigen_name, pheno_data, latent_data) {
+  if (is.null(latent_data) || !all(c("latent_factor_1", "latent_factor_2") %in% names(latent_data))) {
+    return(ggplot() + annotate("text", x = 0.5, y = 0.5, label = "Latent factor components not available") + theme_void())
   }
   
   soft_col <- glue("{antigen_name}_sero_soft")
@@ -501,26 +511,26 @@ plot_pc1_trends <- function(antigen_name, pheno_data, covar_data) {
     return(ggplot() + annotate("text", x = 0.5, y = 0.5, label = "Required columns missing for this antigen") + theme_void())
   }
   
-  # Check if we have both PC1 components
-  if (!all(c("PC1_assay_noise", "PC1_seropositive") %in% names(covar_data))) {
-    return(ggplot() + annotate("text", x = 0.5, y = 0.5, label = "PC1 components not available") + theme_void())
+  # Check if we have both latent factor components
+  if (!all(c("latent_factor_1", "latent_factor_2") %in% names(latent_data))) {
+    return(ggplot() + annotate("text", x = 0.5, y = 0.5, label = "Latent factor components not available") + theme_void())
   }
   
   merged <- pheno_data %>%
     select(IID, soft = all_of(soft_col), igg = all_of(igg_col)) %>%
-    left_join(covar_data, by = "IID") %>%
-    filter(!is.na(soft) & !is.na(igg) & !is.na(PC1_assay_noise) & !is.na(PC1_seropositive))
+    left_join(latent_data, by = "IID") %>%
+    filter(!is.na(soft) & !is.na(igg) & !is.na(latent_factor_1) & !is.na(latent_factor_2))
   
   # Split into high and low probability groups
   high_prob <- merged %>% filter(soft > 0.95)
   low_prob  <- merged %>% filter(soft < 0.05)
   
-  # Create four facets: PC1_assay_noise and PC1_seropositive for each group
+  # Create four facets: latent_factor_1 and latent_factor_2 for each group
   plot_data <- bind_rows(
-    low_prob %>% mutate(group = "Low Prob (<0.05)", pc_type = "PC1_assay_noise", pc_value = PC1_assay_noise),
-    low_prob %>% mutate(group = "Low Prob (<0.05)", pc_type = "PC1_seropositive", pc_value = PC1_seropositive),
-    high_prob %>% mutate(group = "High Prob (>0.95)", pc_type = "PC1_assay_noise", pc_value = PC1_assay_noise),
-    high_prob %>% mutate(group = "High Prob (>0.95)", pc_type = "PC1_seropositive", pc_value = PC1_seropositive)
+    low_prob %>% mutate(group = "Low Prob (<0.05)", pc_type = "latent_factor_1", pc_value = latent_factor_1),
+    low_prob %>% mutate(group = "Low Prob (<0.05)", pc_type = "latent_factor_2", pc_value = latent_factor_2),
+    high_prob %>% mutate(group = "High Prob (>0.95)", pc_type = "latent_factor_1", pc_value = latent_factor_1),
+    high_prob %>% mutate(group = "High Prob (>0.95)", pc_type = "latent_factor_2", pc_value = latent_factor_2)
   )
   
   p <- ggplot(plot_data, aes(x = exp(igg), y = pc_value)) +
@@ -529,10 +539,10 @@ plot_pc1_trends <- function(antigen_name, pheno_data, covar_data) {
     facet_grid(pc_type ~ group, scales = "free") +
     scale_x_log10(labels = scales::label_number(accuracy = 1)) +
     labs(
-      title = glue("PC1 Components vs IgG Level: {antigen_name}"),
-      subtitle = "Top: PC1_assay_noise (seroneg), Bottom: PC1_seropositive (seropos)",
+      title = glue("Latent Factor Components vs IgG Level: {antigen_name}"),
+      subtitle = "Top: latent_factor_1 (seroneg), Bottom: latent_factor_2 (seropos)",
       x = "MFI (log scale)",
-      y = "PC1 Value"
+      y = "Latent Factor Value"
     ) +
     theme_light()
   
@@ -597,7 +607,7 @@ for (antigen in core_antigens) {
   p5 <- plot_igg_vs_probability(antigen, master_pheno_table, threshold)
   p6 <- plot_probability_histogram(antigen, master_pheno_table)
   p7 <- plot_classification_comparison(antigen, master_pheno_table, threshold)
-  p8 <- plot_pc1_trends(antigen, master_pheno_table, covar_table)
+  p8 <- plot_pc1_trends(antigen, master_pheno_table, latent_factors_data)
 
   combined_plot <- (p1 + p2) / (p3 + p4) / (p5 + p6) / (p7 + p8) +
     plot_layout(guides = "collect") +
