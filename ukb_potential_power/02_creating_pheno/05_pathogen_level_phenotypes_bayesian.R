@@ -1,13 +1,13 @@
 ################################################################################
 #   UKB SEROLOGY: PATHOGEN-LEVEL PHENOTYPES (BAYESIAN) - SCRIPT 05
 ################################################################################
-#  ∙ This script provides a Bayesian alternative to the frequentist mixture
-#    models, using the `brms` package (a frontend for Stan).
-#  ∙ For each pathogen, it fits a univariate 2-component Gaussian mixture model
-#    to each of its constituent antigens. This is the Bayesian equivalent of
-#    the model in script 02 and is highly robust.
-#  ∙ The resulting posterior probabilities of seropositivity for each antigen
-#    are then combined using a simple mean to get a final pathogen-level call.
+#  ∙ This script provides a fully Bayesian, multivariate approach to generating
+#    pathogen-level serostatus calls, using the `brms` package.
+#  ∙ For each pathogen, it fits a single 2-component multivariate Gaussian
+#    mixture model to the log-MFI values of all its constituent antigens.
+#  ∙ This is the Bayesian equivalent of the `mclust` model but is far more
+#    robust to the model fitting issues encountered with frequentist methods.
+#    It learns the correlations between antigens and weights them optimally.
 #  ∙ NOTE: This script is configured to run on a small subsample (n=200) for
 #    speed. To run on the full dataset, comment out the subsampling line.
 ################################################################################
@@ -69,42 +69,33 @@ pathogen_pheno_list <- map(names(pathogen_map), function(pathogen_name) {
   analysis_data <- sample_n(complete_cases, 200)
   cat("  -> Using a subsample of", nrow(analysis_data), "for rapid testing.\n")
 
-
-  # This will store the posterior probabilities for each antigen
-  posterior_probs <- tibble(FID = analysis_data$FID, IID = analysis_data$IID)
+  # --- Construct the multivariate formula ---
+  mv_formula_str <- glue("mvbind({paste(igg_cols, collapse = ', ')}) ~ 1")
+  model_formula <- bf(as.formula(mv_formula_str), 
+                      family = mixture(mvgaussian, mvgaussian))
   
-  # Loop through each antigen for the current pathogen
-  for (antigen in antigens) {
-    col_name <- glue("{antigen}_IgG_raw")
-    cat("    -> Fitting Bayesian mixture model for:", antigen, "\n")
-    
-    # Define the 2-component mixture model formula robustly
-    fml_str <- glue("{col_name} ~ 1")
-    model_formula <- bf(as.formula(fml_str), family = mixture(gaussian, gaussian))
-    
-    # Fit the model using brms
-    # Using 'silent = 2' to suppress Stan compilation messages
-    fit <- brm(model_formula, 
-               data = analysis_data, 
-               chains = 2, iter = 1000, warmup = 300,
-               silent = 2, refresh = 0)
-    
-    # Extract posterior predictions (gives probabilities for each component)
-    preds <- posterior_epred(fit)
-    
-    # Identify the "high titre" component (the one with the larger mean)
-    mu <- as.data.frame(fit)$b_mu2 # mu1 is fixed to 0
-    pos_comp <- if (mean(mu) > 0) 2 else 1
-    
-    # Get the mean posterior probability of belonging to the positive component
-    p_soft <- colMeans(preds[,,pos_comp])
-    
-    posterior_probs[[glue("{antigen}_sero_soft")]] <- p_soft
-  }
+  cat("    -> Fitting multivariate Bayesian mixture model...\n")
+  fit <- brm(model_formula, 
+             data = analysis_data, 
+             chains = 2, iter = 1000, warmup = 300,
+             silent = 2, refresh = 0)
   
-  # Combine the per-antigen probabilities using the mean
-  prob_cols_to_combine <- glue("{antigens}_sero_soft")
-  p_soft_combined <- rowMeans(posterior_probs[prob_cols_to_combine], na.rm = TRUE)
+  # Extract posterior predictions (gives probabilities for each component)
+  preds <- posterior_epred(fit)
+  
+  # Identify the "high titre" component (the one with the larger mean vector sum)
+  # brms names mu parameters like b_mu1_antigen1, b_mu2_antigen1, etc.
+  fit_summary <- as.data.frame(fit)
+  mu1_cols <- names(fit_summary)[str_starts(names(fit_summary), "b_mu1_")]
+  mu2_cols <- names(fit_summary)[str_starts(names(fit_summary), "b_mu2_")]
+  
+  mu1_sum <- sum(colMeans(fit_summary[mu1_cols]))
+  mu2_sum <- sum(colMeans(fit_summary[mu2_cols]))
+  
+  pos_comp <- if (mu2_sum > mu1_sum) 2 else 1
+  
+  # Get the mean posterior probability of belonging to the positive component
+  p_soft_combined <- colMeans(preds[,,pos_comp])
   
   # Create the final phenotype tibble for this pathogen
   tibble(
