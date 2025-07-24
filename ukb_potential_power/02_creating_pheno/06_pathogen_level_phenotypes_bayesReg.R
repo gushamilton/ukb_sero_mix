@@ -126,7 +126,7 @@ for (pth in names(pathogen_map)) {
   
   # Print summary statistics
   cat(glue("\n--- {pth} Summary ---\n"))
-  cat(glue("Seroprevalence (≥0.5): {seroprevalence:.1%} ({seroprev_ci[1]:.1%} - {seroprev_ci[2]:.1%})\n"))
+  cat(glue("Seroprevalence (≥0.5): {scales::percent(seroprevalence, accuracy = 0.1)} ({scales::percent(seroprev_ci[1], accuracy = 0.1)} - {scales::percent(seroprev_ci[2], accuracy = 0.1)})\n"))
   cat(glue("Mean CI width: {mean(pi_ci_width):.3f}\n"))
   cat(glue("Coefficients:\n"))
   coef_summary <- summary(fit)$fixed
