@@ -30,36 +30,6 @@ pathogen_map <- list(
   HP  = c("hp_caga",  "hp_vaca", "hp_omp", "hp_groel", "hp_catalase", "hp_urea")
 )
 
-# Butler-Laporte et al. 2023 MFI thresholds for exact comparison --------------
-butler_laporte_thresholds <- list(
-  # EBV antigens
-  ebv_vca_p18 = 250,
-  ebv_ebna1 = 250, 
-  ebv_zebra = 100,
-  ebv_ea_d = 100,
-  
-  # CMV antigens
-  cmv_pp150 = 100,
-  cmv_pp52 = 150,
-  cmv_pp28 = 200,
-  
-  # H. pylori antigens
-  hp_caga = 400,
-  hp_vaca = 100,
-  hp_omp = 170,
-  hp_groel = 80,
-  hp_catalase = 180,
-  hp_urea = 130,
-  
-  # C. trachomatis antigens
-  ct_mompa = 100,
-  ct_mompd = 100,
-  ct_tarpf1 = 100,
-  ct_tarpf2 = 100,
-  ct_porb = 80,
-  ct_pgp3 = 200
-)
-
 # UKB rule as noisy target (Butler-Laporte et al. 2023) ------------------------
 ukb_rules <- list(
   EBV = list(type = "count", n = 2),  # Positive for 2 or more antigens
@@ -67,53 +37,6 @@ ukb_rules <- list(
   HP  = list(type = "count_exclude_caga", n = 2),  # Positive for 2 or more antigens, except CagA
   CT  = list(type = "pgp3_or_complex")  # Positive for pGP3 OR negative for pGP3 but positive for 2 out of 5 remaining antigens
 )
-
-# Function to create hard cutoffs using Butler-Laporte thresholds
-make_butler_laporte_hard <- function(df, antigens, pathogen) {
-  hard_cols <- character(length(antigens))
-  
-  for (i in seq_along(antigens)) {
-    antigen <- antigens[i]
-    mfi_col <- paste0(antigen, "_mfi")
-    threshold <- butler_laporte_thresholds[[antigen]]
-    
-    if (is.null(threshold)) {
-      stop("Missing threshold for antigen: ", antigen)
-    }
-    
-    hard_cols[i] <- paste0(antigen, "_bl_hard")
-    df[[hard_cols[i]]] <- as.integer(df[[mfi_col]] >= threshold)
-  }
-  
-  # Apply Butler-Laporte rules
-  if (pathogen == "EBV") {
-    # Positive for 2 or more antigens
-    df[[paste0(tolower(pathogen), "_bl_hard")]] <- 
-      as.integer(rowSums(df[hard_cols], na.rm = TRUE) >= 2)
-  } else if (pathogen == "CMV") {
-    # Positive for 2 or more antigens
-    df[[paste0(tolower(pathogen), "_bl_hard")]] <- 
-      as.integer(rowSums(df[hard_cols], na.rm = TRUE) >= 2)
-  } else if (pathogen == "HP") {
-    # Positive for 2 or more antigens, except CagA
-    cols_no_caga <- hard_cols[!grepl("caga", hard_cols)]
-    df[[paste0(tolower(pathogen), "_bl_hard")]] <- 
-      as.integer(rowSums(df[cols_no_caga], na.rm = TRUE) >= 2)
-  } else if (pathogen == "CT") {
-    # Positive for pGP3 OR negative for pGP3 but positive for 2 out of 5 remaining antigens
-    pgp3_col <- "ct_pgp3_bl_hard"
-    other_cols <- hard_cols[hard_cols != "ct_pgp3_bl_hard"]
-    
-    pgp3_positive <- df[[pgp3_col]] == 1
-    pgp3_negative_but_others <- (df[[pgp3_col]] == 0) & 
-                               (rowSums(df[other_cols], na.rm = TRUE) >= 2)
-    
-    df[[paste0(tolower(pathogen), "_bl_hard")]] <- 
-      as.integer(pgp3_positive | pgp3_negative_but_others)
-  }
-  
-  return(df)
-}
 
 make_label <- function(df, antigens, rule){
   if (rule$type == "count") {
@@ -164,9 +87,6 @@ for (pth in names(pathogen_map)) {
   }
 
   df$z <- make_label(df, antigens, ukb_rules[[pth]])
-
-  # Create Butler-Laporte hard cutoffs for exact comparison
-  df <- make_butler_laporte_hard(df, antigens, pth)
 
   # Use full dataset (no subsampling) -----------------------------------------
   df_model <- df
@@ -288,10 +208,7 @@ for (pth in names(pathogen_map)) {
   gwas_outputs[[pth]] <- df %>%
     select(FID, IID) %>%
     mutate(
-      # Butler-Laporte exact hard seroprevalence (for comparison with paper)
-      !!glue("{tolower(pth)}_bl_hard") := df[[paste0(tolower(pth), "_bl_hard")]],
-      
-      # UKB rule hard seroprevalence (noisy target)
+      # Butler-Laporte/UKB hard seroprevalence
       !!glue("{tolower(pth)}_ukb_hard") := df$ukb_hard,
       
       # Best Bayesian seroprevalence (hard)
@@ -379,10 +296,6 @@ for (pth in names(gwas_outputs)) {
   low <- tolower(pth)
   res <- gwas_outputs[[pth]]
   
-  # Butler-Laporte hard phenotypes (exact paper comparison)
-  write_tsv(res %>% select(FID, IID, !!glue("{low}_bl_hard")),
-            glue("quickdraws_input/{low}_bl_hard.pheno"))
-  
   # UKB hard phenotypes
   write_tsv(res %>% select(FID, IID, !!glue("{low}_ukb_hard")),
             glue("quickdraws_input/{low}_ukb_hard.pheno"))
@@ -394,6 +307,12 @@ for (pth in names(gwas_outputs)) {
   # Bayesian soft phenotypes
   write_tsv(res %>% select(FID, IID, !!glue("{low}_bayes_soft")),
             glue("quickdraws_input/{low}_bayes_soft.pheno"))
+  
+  # Weight files for Bayesian approaches
+  write_tsv(res %>% select(FID, IID, Weight = !!glue("{low}_w_soft")),
+            glue("quickdraws_input/{low}_bayes_soft.weights"))
+  write_tsv(res %>% select(FID, IID, Weight = !!glue("{low}_w_hard")),
+            glue("quickdraws_input/{low}_bayes_hard.weights"))
 }
 
 # Create summary table
@@ -404,7 +323,6 @@ summary_table <- map_dfr(names(gwas_outputs), function(pth) {
   tibble(
     Pathogen = pth,
     N_Total = nrow(res),
-    Butler_Laporte_Seroprev = mean(res[[glue("{low}_bl_hard")]], na.rm = TRUE),
     UKB_Hard_Seroprev = mean(res[[glue("{low}_ukb_hard")]], na.rm = TRUE),
     Bayes_Hard_Seroprev = mean(res[[glue("{low}_bayes_hard")]], na.rm = TRUE),
     Mean_Soft_Prob = mean(res[[glue("{low}_bayes_soft")]], na.rm = TRUE),
