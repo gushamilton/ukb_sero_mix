@@ -1,11 +1,13 @@
 ################################################################################
 #
 #   UKB SEROLOGY: COMPREHENSIVE ANTIGEN & PATHOGEN DIAGNOSTIC PLOTS
-#   VERSION: 6.0 (User's original script, adapted for compatibility + new features)
+#   VERSION: 9.0 (Final - With PDF size reduction via point shape)
 #
-#   ▸ This script preserves the original structure and plots from the user-provided
-#     script, adapting them to work with the outputs of '01_final_master_sero_phenotype.R'.
-#   ▸ It adds the requested pathogen-level diagnostics at the end.
+#   ▸ This script is compatible with the output of '01_final_master_sero_phenotype.R'.
+#   ▸ It preserves all original plots, adapting them to the new data columns.
+#   ▸ It uses `shape = "."` in dense scatter plots to reduce PDF file size
+#     without requiring external dependencies like Cairo.
+#   ▸ It includes the requested pathogen-level diagnostics at the end.
 #
 ################################################################################
 
@@ -151,7 +153,7 @@ plot_probability_colored_distribution <- function(antigen_name, pheno_data) {
   if (!all(c(igg_col, soft_col) %in% names(pheno_data))) return(ggplot() + annotate("text",x=0.5,y=0.5,label="Data missing") + theme_void())
   df <- pheno_data %>% select(igg = all_of(igg_col), prob = all_of(soft_col)) %>% filter(is.finite(igg) & !is.na(prob))
   ggplot(df, aes(x = exp(igg), y = prob, colour = prob)) +
-    geom_point(alpha = 0.4, size = 0.6, stroke = 0) +
+    geom_point(alpha = 0.5, shape = ".") +
     scale_colour_viridis_c(name = "Seropositive\nProbability", option = "plasma") +
     scale_x_log10(labels = scales::label_number(accuracy = 1)) +
     labs(title = glue("IgG vs Seropositive Probability: {antigen_name}"), x = "MFI (log scale)", y = "Seropositive Probability (p_soft)") +
@@ -216,7 +218,7 @@ plot_igg_vs_probability <- function(antigen_name, pheno_data, threshold) {
   plot_data <- pheno_data %>% select(igg = all_of(igg_col), prob = all_of(soft_col)) %>% filter(!is.na(igg) & !is.na(prob))
   
   ggplot(plot_data, aes(x = exp(igg), y = prob)) +
-    geom_point(alpha = 0.6, size = 0.5) +
+    geom_point(alpha = 0.6, shape = ".") +
     geom_vline(xintercept = threshold, color = "red", linetype = "dashed", linewidth = 1) +
     geom_hline(yintercept = 0.5, color = "blue", linetype = "dashed", linewidth = 1) +
     scale_x_log10(labels = scales::label_number(accuracy = 1)) +
@@ -241,17 +243,11 @@ plot_classification_comparison <- function(antigen_name, pheno_data, threshold) 
 
   plot_data <- pheno_data %>%
     select(p_soft = all_of(soft_col), bl = all_of(bl_col), mix = all_of(mix_col)) %>%
-    filter(!is.na(p_soft) & !is.na(bl) & !is.na(mix)) %>%
-    mutate(Classification = case_when(
-        bl == 1 & mix == 1 ~ "Concordant Positive",
-        bl == 0 & mix == 0 ~ "Concordant Negative",
-        bl == 1 & mix == 0 ~ "Discordant (BL+, Mix-)",
-        bl == 0 & mix == 1 ~ "Discordant (BL-, Mix+)",
-    ))
+    filter(!is.na(p_soft) & !is.na(bl) & !is.na(mix))
 
   ggplot(plot_data, aes(y = p_soft)) +
-    geom_jitter(aes(x = bl, color = "BL Hard Call"), width = 0.2, alpha = 0.3) +
-    geom_jitter(aes(x = mix + 0.1, color = "Mix Hard Call"), width = 0.2, alpha = 0.3) + # offset for visibility
+    geom_jitter(aes(x = bl, color = "BL Hard Call"), width = 0.2, alpha = 0.3, shape = ".") +
+    geom_jitter(aes(x = mix + 0.1, color = "Mix Hard Call"), width = 0.2, alpha = 0.3, shape = ".") + # offset for visibility
     scale_color_manual(values = c("BL Hard Call" = "red", "Mix Hard Call" = "blue")) +
     scale_x_continuous(breaks = c(0, 1), labels = c("Seronegative", "Seropositive")) +
     labs(
@@ -295,7 +291,7 @@ plot_pc1_vs_igg <- function(antigen_name, pheno_data, latent_data) {
       prob > 0.95 ~ "Likely Seropositive (>0.95)", prob < 0.05 ~ "Likely Seronegative (<0.05)", TRUE ~ "Ambiguous (0.05–0.95)"
     ))
   ggplot(merged, aes(x = exp(igg), y = latent_factor_1, colour = group)) +
-    geom_point(alpha = 0.5, size = 0.6, stroke = 0) +
+    geom_point(alpha = 0.5, shape = ".") +
     scale_colour_manual(values = c("Likely Seropositive (>0.95)" = "red", "Likely Seronegative (<0.05)" = "blue", "Ambiguous (0.05–0.95)" = "grey")) +
     scale_x_log10(labels = scales::label_number(accuracy = 1)) +
     labs(title = glue("IgG vs latent_factor_1: {antigen_name}"), x = "MFI (log scale)", y = "latent_factor_1", colour = "Group") +
@@ -321,7 +317,7 @@ plot_pc1_trends <- function(antigen_name, pheno_data, latent_data) {
   )
   
   ggplot(plot_data, aes(x = exp(igg), y = pc_value)) +
-    geom_point(alpha = 0.3, size = 0.5) +
+    geom_point(alpha = 0.3, shape = ".") +
     geom_smooth(method = "lm", se = TRUE, color = "red", linewidth = 1) +
     facet_grid(pc_type ~ group, scales = "free") +
     scale_x_log10(labels = scales::label_number(accuracy = 1)) +
@@ -350,12 +346,15 @@ plot_probability_histogram <- function(antigen_name, pheno_data) {
 # --- 4. MAIN ANTIGEN PLOTTING LOOP (from user's script) ---
 cat("\n--- Generating Comprehensive Diagnostic Plots (single PDF with all antigens) ---\n")
 
-all_plots <- list()
-for (antigen in core_antigens) {
+# Use a temporary directory for individual plots to avoid issues with parallel saving
+temp_plot_dir <- "antigen_diagnostics/temp_plots"
+if (!dir.exists(temp_plot_dir)) dir.create(temp_plot_dir, recursive = TRUE)
+
+future_walk(core_antigens, function(antigen) {
   cat("Processing:", antigen, "\n")
   if (!glue("{antigen}_p_soft") %in% names(master_pheno_table)) {
       cat("  -> Skipping", antigen, "- essential data columns not found.\n")
-      next
+      return(NULL)
   }
   
   threshold <- antigen_map$threshold[antigen_map$short_name == antigen]
@@ -372,9 +371,6 @@ for (antigen in core_antigens) {
   p6 <- plot_probability_histogram(antigen, master_pheno_table)
   p7 <- plot_classification_comparison(antigen, master_pheno_table, threshold)
   p8 <- plot_pc1_trends(antigen, master_pheno_table, latent_factors_data)
-
-  # Note: The original script had several functions defined but only used these 8 in the final plot.
-  # The original `plot_weight_distributions` is not called here, which is fortunate as data is unavailable.
   
   combined_plot <- (p1 + p2) / (p3 + p4) / (p5 + p6) / (p7 + p8) +
     plot_layout(guides = "collect") +
@@ -384,14 +380,30 @@ for (antigen in core_antigens) {
       theme = theme(plot.title = element_text(size = 16, face = "bold"))
     )
   
-  all_plots[[antigen]] <- combined_plot
+  # Save individual plot object to temporary file
+  saveRDS(combined_plot, file.path(temp_plot_dir, glue("plot_{antigen}.rds")))
+  
   cat("  -> Processed", antigen, "\n")
-}
+}, .options = furrr_options(seed = TRUE))
+
+
+# Assemble the final PDF from the saved plot objects
+cat("\nAssembling final PDF from generated plots...\n")
+plot_files <- list.files(temp_plot_dir, pattern = "\\.rds$", full.names = TRUE)
+# Ensure correct order
+ordered_antigens <- map_chr(plot_files, ~str_extract(basename(.x), "(?<=plot_).*(?=\\.rds$)"))
+plot_files <- plot_files[order(match(ordered_antigens, core_antigens))]
+
+all_plots <- map(plot_files, readRDS)
 
 pdf("antigen_diagnostics/comprehensive_antigen_diagnostics.pdf", width = 18, height = 22, onefile = TRUE)
-for (antigen in names(all_plots)) { print(all_plots[[antigen]]) }
+for (p in all_plots) { print(p) }
 dev.off()
+
+# Clean up temporary directory
+unlink(temp_plot_dir, recursive = TRUE)
 cat("  -> Saved comprehensive antigen PDF\n")
+
 
 # --- 5. CREATE SUMMARY REPORT (ADAPTED) ---
 cat("\n--- Creating Summary Report ---\n")
@@ -414,6 +426,7 @@ summary_stats <- map_dfr(core_antigens, function(antigen) {
 })
 write_tsv(summary_stats, "antigen_diagnostics/summary_statistics.tsv")
 cat("  -> Saved summary statistics.\n")
+
 
 # --- 6. PATHOGEN-LEVEL DIAGNOSTIC ANALYSIS (NEW SECTION) ---
 cat("\n--- Generating Pathogen-Level Diagnostic Report (0-1 Scale) ---\n")

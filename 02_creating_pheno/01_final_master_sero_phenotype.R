@@ -6,13 +6,6 @@
 #     from raw MFI data to GWAS-ready input files. It implements the
 #     five-analysis strategy for both individual antigens and aggregated pathogens.
 #
-#   ▸ Analysis Types Generated:
-#     1. BL_SER0: Exact replication of Butler-Laporte hard-call serostatus.
-#     2. BL_IGG_SERPOS: Exact replication of BL quantitative (IgG in seropositives).
-#     3. MIX_SER0: New hard-call serostatus from an optimal mixture-model threshold.
-#     4. P_SOFT: Primary discovery phenotype using standardized soft probabilities.
-#     5. IGG_WGT: Primary quantitative phenotype using weighted IgG (weights=p_soft).
-#
 ################################################################################
 
 # --- 1. SETUP & CONFIGURATION -------------------------------------------------
@@ -416,19 +409,16 @@ write_tsv(all_covar, "quickdraws_input/covariates_all.tsv")
 cat("  -> Wrote combined covariates (all)\n")
 
 
-# --- 8. FINAL MANIFEST & FILE EXPORT (REVISED AND SIMPLIFIED LOGIC) --------------
-cat("\n--- Finalizing Manifest and Exporting Files ---\n")
+# --- 8. BUILD FULL MANIFEST & WRITE COMPLETE FILES FOR VISUALIZATION ------------
+cat("\n--- Building Full Manifest for All Phenotypes ---\n")
 
 manifest_list <- list()
 
 # 8a. Add Antigen Phenotypes to Manifest
 successful_antigens <- names(all_model_fits)
 for (ab in successful_antigens) {
-    # FIX: All binary phenotypes are 'logistic' for file sorting.
     manifest_list[[length(manifest_list) + 1]] <- tibble(id = "BL_SER0", phenotype_name = glue("{ab}_sero_hard_BL"), analysis_type = "logistic", weights_file = NA)
     manifest_list[[length(manifest_list) + 1]] <- tibble(id = "MIX_SER0", phenotype_name = glue("{ab}_sero_hard_mix"), analysis_type = "logistic", weights_file = NA)
-    
-    # Quantitative phenotypes are 'linear'.
     manifest_list[[length(manifest_list) + 1]] <- tibble(id = "BL_IGG_SERPOS", phenotype_name = glue("{ab}_IgG_seropos_BL"), analysis_type = "linear", weights_file = NA)
     manifest_list[[length(manifest_list) + 1]] <- tibble(id = "P_SOFT", phenotype_name = glue("{ab}_psoft_std"), analysis_type = "linear", weights_file = NA)
     manifest_list[[length(manifest_list) + 1]] <- tibble(id = "IGG_WGT", phenotype_name = glue("{ab}_IgG_raw"), analysis_type = "linear", weights_file = glue("{ab}_p_soft.weights"))
@@ -437,11 +427,8 @@ for (ab in successful_antigens) {
 # 8b. Add Pathogen Phenotypes to Manifest
 successful_pathogens <- tolower(names(pathogen_results_list))
 for (pth in successful_pathogens) {
-    # FIX: All binary phenotypes are 'logistic' for file sorting.
     manifest_list[[length(manifest_list) + 1]] <- tibble(id = "BL_SER0", phenotype_name = glue("{pth}_sero_hard_BL"), analysis_type = "logistic", weights_file = NA)
     manifest_list[[length(manifest_list) + 1]] <- tibble(id = "MIX_SER0", phenotype_name = glue("{pth}_sero_hard_mix"), analysis_type = "logistic", weights_file = NA)
-    
-    # Quantitative phenotypes are 'linear'.
     manifest_list[[length(manifest_list) + 1]] <- tibble(id = "P_SOFT", phenotype_name = glue("{pth}_psoft_std"), analysis_type = "linear", weights_file = NA)
 }
 
@@ -451,14 +438,12 @@ for (lt in all_latent_factors) {
     manifest_list[[length(manifest_list) + 1]] <- tibble(id = "LATENT_FACTOR", phenotype_name = lt, analysis_type = "linear", weights_file = NA)
 }
 
-manifest_df <- bind_rows(manifest_list)
+manifest_full <- bind_rows(manifest_list)
 
-# 8d. Perform Phenotype QC
-phenotypes_to_check <- unique(manifest_df$phenotype_name)
+# 8d. Perform Phenotype QC on the full set of phenotypes
+phenotypes_to_check <- unique(manifest_full$phenotype_name)
 excluded_traits <- future_map_dfr(phenotypes_to_check, function(pheno_name) {
-  if (!pheno_name %in% names(master_pheno_table)) {
-    return(tibble(phenotype_name = pheno_name, reason = "Column not found in master table"))
-  }
+  if (!pheno_name %in% names(master_pheno_table)) { return(tibble(phenotype_name = pheno_name, reason = "Column not found")) }
   pheno_vec_clean <- na.omit(master_pheno_table[[pheno_name]])
   if (length(pheno_vec_clean) == 0) return(tibble(phenotype_name = pheno_name, reason = "All values NA"))
   if (n_distinct(pheno_vec_clean) < 2) return(tibble(phenotype_name = pheno_name, reason = "Unary trait"))
@@ -475,21 +460,19 @@ if(nrow(excluded_traits) > 0) {
   cat("  -> QC: All traits passed variance and unary checks.\n")
 }
 
-# Filter manifest to only include traits that passed QC
 good_trait_names <- setdiff(phenotypes_to_check, excluded_traits$phenotype_name)
-manifest_df <- manifest_df %>% filter(phenotype_name %in% good_trait_names)
+manifest_full <- manifest_full %>% filter(phenotype_name %in% good_trait_names)
 
-write_tsv(manifest_df, "quickdraws_input/analysis_manifest.tsv")
-cat("  -> Wrote", nrow(manifest_df), "analyses to manifest after QC.\n")
+# 8e. Write COMPLETE, UNFILTERED files for plotting and visualization
+cat("\n--- Writing Complete Output Files for Visualization ---\n")
+phenos_quant_full <- master_pheno_table %>% select(FID, IID, any_of(manifest_full %>% filter(analysis_type == "linear") %>% pull(phenotype_name) %>% unique()))
+phenos_binary_full <- master_pheno_table %>% select(FID, IID, any_of(manifest_full %>% filter(analysis_type == "logistic") %>% pull(phenotype_name) %>% unique()))
+write_tsv(phenos_quant_full, "quickdraws_input/phenotypes_quantitative.tsv")
+write_tsv(phenos_binary_full, "quickdraws_input/phenotypes_binary.tsv")
+write_tsv(manifest_full, "quickdraws_input/analysis_manifest.tsv")
+cat("  -> Wrote complete phenotype files and manifest to quickdraws_input/\n")
 
-# 8e. Write Final Phenotype and Weight Files
-phenos_quant <- master_pheno_table %>% select(FID, IID, any_of(manifest_df %>% filter(analysis_type == "linear") %>% pull(phenotype_name) %>% unique()))
-phenos_binary <- master_pheno_table %>% select(FID, IID, any_of(manifest_df %>% filter(analysis_type == "logistic") %>% pull(phenotype_name) %>% unique()))
-write_tsv(phenos_quant, "quickdraws_input/phenotypes_quantitative.tsv")
-write_tsv(phenos_binary, "quickdraws_input/phenotypes_binary.tsv")
-cat("  -> Wrote separate phenotype files: quantitative and binary.\n")
-
-for (w_file in na.omit(unique(manifest_df$weights_file))) {
+for (w_file in na.omit(unique(manifest_full$weights_file))) {
     ab_name <- str_remove(w_file, "_p_soft\\.weights")
     weight_col <- glue("{ab_name}_p_soft")
     if (weight_col %in% names(master_pheno_table)) {
@@ -497,16 +480,29 @@ for (w_file in na.omit(unique(manifest_df$weights_file))) {
         write_tsv(weights_data, file.path("quickdraws_input", w_file))
     }
 }
-cat("  -> Wrote all required weight files.\n")
+cat("  -> Wrote all corresponding weight files.\n")
 
 
-# --- 9. FILTERING FOR GENOTYPED PARTICIPANTS ------------------------------------
-cat("\n--- Filtering for Participants with Genotype Data ---\n")
+# --- 9. FILTER & WRITE GWAS-READY FILES -----------------------------------------
+cat("\n--- Creating Filtered, GWAS-Ready Files ---\n")
 
-fam_file1 <- "genotype_antibody_only.fam"
-fam_file2 <- "chr1_imputed_antibody.fam"
+# 9a. Apply Pathogen-Level Filtering to Manifest for GWAS
+cat("  -> Applying pathogen-level filtering to create GWAS analysis set...\n")
+suppressed_antigens <- unlist(pathogen_map, use.names = FALSE)
+phenotypes_to_exclude <- c(
+    glue("{suppressed_antigens}_sero_hard_BL"),
+    glue("{suppressed_antigens}_sero_hard_mix"),
+    glue("{suppressed_antigens}_psoft_std")
+)
+manifest_gwas <- manifest_full %>% 
+    filter(!phenotype_name %in% phenotypes_to_exclude)
+cat("  -> Created a filtered manifest for GWAS with", nrow(manifest_gwas), "analyses.\n")
+
+# 9b. Filter for Genotyped Participants
 gwas_ready_dir <- "quickdraws_input/gwas_ready_files"
 if (!dir.exists(gwas_ready_dir)) dir.create(gwas_ready_dir)
+fam_file1 <- "genotype_antibody_only.fam"
+fam_file2 <- "chr1_imputed_antibody.fam"
 
 if (!file.exists(fam_file1) || !file.exists(fam_file2)) {
     warning("One or both .fam files not found. Skipping filtering step for GWAS-ready files.")
@@ -515,31 +511,26 @@ if (!file.exists(fam_file1) || !file.exists(fam_file2)) {
     ids_geno2 <- fread(fam_file2, header = FALSE, select = 2, data.table = FALSE)[[1]]
     
     genotyped_ids <- intersect(ids_geno1, ids_geno2)
-    cat(glue("  -> Found {length(genotyped_ids)} participants present in both .fam files.\n"))
-    
-    phenotyped_ids <- master_pheno_table$IID
-    final_ids_for_gwas <- intersect(genotyped_ids, phenotyped_ids)
+    final_ids_for_gwas <- intersect(genotyped_ids, master_pheno_table$IID)
     cat(glue("  -> Found {length(final_ids_for_gwas)} participants with both genotype and phenotype data.\n"))
-
     cat(glue("  -> Writing filtered files to: {gwas_ready_dir}\n"))
 
-    phenos_quant_gwas <- phenos_quant %>% filter(IID %in% final_ids_for_gwas)
-    phenos_binary_gwas <- phenos_binary %>% filter(IID %in% final_ids_for_gwas)
-    write_tsv(phenos_quant_gwas, file.path(gwas_ready_dir, "phenotypes_quantitative.tsv"))
-    write_tsv(phenos_binary_gwas, file.path(gwas_ready_dir, "phenotypes_binary.tsv"))
+    # Write filtered manifest
+    write_tsv(manifest_gwas, file.path(gwas_ready_dir, "analysis_manifest.tsv"))
 
-    all_covar_gwas <- all_covar %>% filter(IID %in% final_ids_for_gwas)
-    base_covar_gwas <- base_covar %>% filter(IID %in% final_ids_for_gwas)
-    write_tsv(all_covar_gwas, file.path(gwas_ready_dir, "covariates_all.tsv"))
-    write_tsv(base_covar_gwas, file.path(gwas_ready_dir, "covariates_base.tsv"))
+    # Create filtered phenotype tables based on the GWAS manifest
+    phenos_quant_gwas <- master_pheno_table %>% select(FID, IID, any_of(manifest_gwas %>% filter(analysis_type == "linear") %>% pull(phenotype_name) %>% unique()))
+    phenos_binary_gwas <- master_pheno_table %>% select(FID, IID, any_of(manifest_gwas %>% filter(analysis_type == "logistic") %>% pull(phenotype_name) %>% unique()))
 
-    file.copy(
-        from = "quickdraws_input/analysis_manifest.tsv",
-        to = file.path(gwas_ready_dir, "analysis_manifest.tsv"),
-        overwrite = TRUE
-    )
+    # Filter by genotype ID and write
+    write_tsv(phenos_quant_gwas %>% filter(IID %in% final_ids_for_gwas), file.path(gwas_ready_dir, "phenotypes_quantitative.tsv"))
+    write_tsv(phenos_binary_gwas %>% filter(IID %in% final_ids_for_gwas), file.path(gwas_ready_dir, "phenotypes_binary.tsv"))
 
-    for (w_file in na.omit(unique(manifest_df$weights_file))) {
+    # Filter and write covariate and weight files
+    write_tsv(all_covar %>% filter(IID %in% final_ids_for_gwas), file.path(gwas_ready_dir, "covariates_all.tsv"))
+    write_tsv(base_covar %>% filter(IID %in% final_ids_for_gwas), file.path(gwas_ready_dir, "covariates_base.tsv"))
+
+    for (w_file in na.omit(unique(manifest_gwas$weights_file))) {
         original_path <- file.path("quickdraws_input", w_file)
         if (file.exists(original_path)) {
             weights_data <- read_tsv(original_path, show_col_types = FALSE) %>%
@@ -559,7 +550,7 @@ write_tsv(as_tibble(latent_cor, rownames = "Latent_Factor"), "results/latent_fac
 cat("  -> Saved latent factor correlations.\n")
 
 # Summary of seroprevalence
-qc_passed_prefixes <- unique(str_remove(manifest_df$phenotype_name, "_IgG_raw|_p_soft|_sero_hard_BL|_IgG_seropos_BL|_sero_hard_mix|_psoft_std"))
+qc_passed_prefixes <- unique(str_remove(manifest_full$phenotype_name, "_IgG_raw|_p_soft|_sero_hard_BL|_IgG_seropos_BL|_sero_hard_mix|_psoft_std"))
 summary_table <- map_dfr(qc_passed_prefixes, function(trait_prefix) {
   bl_col <- glue("{trait_prefix}_sero_hard_BL")
   mix_col <- glue("{trait_prefix}_sero_hard_mix")
