@@ -13,7 +13,7 @@
 
 # --- 1. Packages & Setup ---
 if (!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(dplyr, tibble, purrr, sn, mixsmsn, furrr, future, readr)
+pacman::p_load(tidyverse, tibble, purrr, sn, mixsmsn, furrr, future, readr)
 
 # --- Set up parallel processing ---
 plan(multicore)
@@ -89,7 +89,7 @@ run_one_analysis <- function(sim_data) {
 }
 
 # --- 4. Main Simulation Execution ---
-N_SIMULATIONS <- 2
+N_SIMULATIONS <- 100
 N_SAMPLES <- 2000
 SNP_MAF <- 0.2
 beta_effects <- seq(-0.25, 0.25, length.out = 5)
@@ -131,7 +131,7 @@ raw_results <- future_map_dfr(1:nrow(full_sim_grid), ~{
         select(params_row, scenario_name, beta, gamma, sim_id),
         analysis_res
     )
-}, .options = furrr_options(seed = NULL), .progress = TRUE)
+}, .options = furrr_options(seed = NULL), .progress = FALSE)
 
 raw_results
 # --- 5. Save RAW Results ---
