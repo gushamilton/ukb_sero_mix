@@ -41,9 +41,8 @@ dx run app-swiss-army-knife \
   -iin="QuickdrawsGWAS/weights/kshv_lana_p_soft.weights" \
   -iin="QuickdrawsGWAS/weights/mcv_vp1_p_soft.weights" \
   -iin="QuickdrawsGWAS/weights/toxo_p22_p_soft.weights" \
-    -iin="quickdraws_step2_patched.py" \
   -icmd="bash chr22_weighted.sh" \
   --instance-type=mem1_ssd1_v2_x8 \
   --name="qd_step2_weighted_chr22" \
-  --priority=normal \
+  --priority=high \
   -y

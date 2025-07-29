@@ -113,7 +113,7 @@ run_one_analysis <- function(sim_data) {
 }
 
 # --- 4. Main Simulation Execution ---
-N_SIMULATIONS <- 200
+N_SIMULATIONS <- 500
 N_SAMPLES <- 2000
 SNP_MAF <- 0.2
 beta_effects <- seq(-0.25, 0.25, length.out = 5)

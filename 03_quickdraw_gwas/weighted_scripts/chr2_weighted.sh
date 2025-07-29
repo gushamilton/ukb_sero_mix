@@ -36,7 +36,6 @@ run_trait () {
   local WFILE=${TRAIT%%_IgG_raw}_p_soft.weights
 
   docker run --security-opt seccomp=unconfined --rm -v "$PWD":/mnt quickdraws \
-  python /mnt/quickdraws_step2_patched.py \
     quickdraws-step-2 \
       --out /mnt/step2_chr2_${TRAIT} \
       --bed ${BED} \
