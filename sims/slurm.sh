@@ -5,7 +5,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --mem=6G
 #SBATCH --cpus-per-task=16
-
+#SBATCH --account=sscm013902
 
 # Load R module (adjust as needed for your cluster)
 module load languages/R

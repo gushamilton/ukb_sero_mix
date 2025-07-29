@@ -17,12 +17,14 @@ TRAITS_P1=( hsv1_IgG_raw hsv2_IgG_raw ebv_vca_IgG_raw ebv_ebna1_IgG_raw
             bkv_vp1_IgG_raw jcv_vp1_IgG_raw )
 
 TRAITS_P2=( mcv_vp1_IgG_raw ct_mompa_IgG_raw ct_mompd_IgG_raw ct_tarpf1_IgG_raw
-            ct_tarpf2_IgG_raw ct_pgp3_IgG_raw hp_caga_IgG_raw hp_vaca_IgG_raw
+            ct_tarpf2_IgG_raw ct_pgp3_IgG_raw hp_vaca_IgG_raw
             hp_omp_IgG_raw hp_groel_IgG_raw hp_catalase_IgG_raw hp_urea_IgG_raw
             toxo_p22_IgG_raw kshv_lana_IgG_raw )
 
 # 2.  Common inputs
-BED=/mnt/chr16_imputed_antibody
+# MODIFIED: Changed from BED to BGEN and SAMPLE file inputs.
+BGEN=/mnt/chr16_imputed.bgen
+SAMPLE=/mnt/chr16_imputed.sample
 COVAR=/mnt/covariates_master.tsv
 UNREL=/mnt/unrel_FID_IID.txt
 
@@ -62,13 +64,20 @@ run_trait () {
     # ---------------- 2d. weight file for participation-bias regression
     local WFILE=${TRAIT%%_IgG_raw}_p_soft.weights   # hsv1_p_soft.weights
 
+    # NEW: Define the calibration file based on the batch (p1 or p2)
+    local CAL_FILE="/mnt/step2_${BATCH}.calibration"
+
     # ---------------- 2e. fire up Step 2
+    # MODIFIED: Changed --bed flag to --bgen and --sample.
+    # ADDED: --calibrationFile argument using the batch-specific file.
     docker run --security-opt seccomp=unconfined --rm -v "$PWD":/mnt quickdraws \
       quickdraws-step-2 \
         --out /mnt/step2_chr16_${TRAIT} \
-        --bed ${BED} \
+        --bgen ${BGEN} \
+        --sample ${SAMPLE} \
         --out_step1 /mnt/${PREFIX} \
         --covarFile ${COVAR} \
+        --calibrationFile ${CAL_FILE} \
         --unrel_sample_list ${UNREL} \
         --sample_weights /mnt/${WFILE}
 }
@@ -83,4 +92,4 @@ for T in "${TRAITS_P2[@]}"; do
 done
 
 # 4.  (Optional) tidy-up
-# rm -f *_1.loco *.traits *.covar_effects *.neff
+ rm -f *_1.loco *.traits *.covar_effects *.neff
