@@ -162,7 +162,7 @@ raw_results <- future_map_dfr(1:nrow(full_sim_grid), ~{
     analysis_res <- run_one_analysis(sim_data)
     
     bind_cols(select(params_row, scenario_name, beta, gamma, sim_id), analysis_res)
-}, .options = furrr_options(seed = NULL), .progress = TRUE)
+}, .options = furrr_options(seed = NULL), .progress = FALSE)
 
 raw_results
 # --- 5. Save RAW Results ---
