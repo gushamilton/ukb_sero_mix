@@ -1,0 +1,1 @@
+The approach here is simple but limited by Quickdraws ability to do logisitc regression models
